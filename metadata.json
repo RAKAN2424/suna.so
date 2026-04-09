@@ -1,0 +1,7 @@
+{
+  "name": "Hafiz Bel'Amya (Egyptian Studio Pro)",
+  "description": "An Egyptian Arabic AI studio for generating songs, adding diacritics, spell checking, and word pronunciation search.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}

@@ -1,0 +1,529 @@
+1:import React, { useState, useEffect, useRef } from 'react';
+2:import { 
+9:import { motion, AnimatePresence } from 'motion/react';
+10:import { GoogleGenAI } from '@google/genai';
+11:import { Document, Packer, Paragraph, TextRun } from 'docx';
+12:import { useVirtualizer } from '@tanstack/react-virtual';
+16:const App = () => {
+38:  useEffect(() => {
+40:    if (SpeechRecognition) {
+46:      recognitionRef.current.onresult = (event: any) => {
+48:        for (let i = event.resultIndex; i < event.results.length; ++i) {
+51:        if (finalTranscript) {
+55:      recognitionRef.current.onerror = (e: any) => {
+63:  const toggleListening = () => {
+64:    if (isListening) {
+66:    } else {
+68:      try {
+71:      } catch (e) {
+77:  const speakText = (textToSpeak: string) => {
+78:    if (!window.speechSynthesis) {
+91:    if (arabicVoice) {
+100:  const callAI = async (promptText: string, systemInstruction: string, useSearch = false, expectJson = false, audioData?: { data: string, mimeType: string }) => {
+101:    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+105:    const config: any = {
+109:    if (useSearch) {
+110:      config.tools = [{ googleSearch: {} }];
+113:    if (expectJson) {
+119:          { inlineData: { data: audioData.data, mimeType: audioData.mimeType } },
+124:    while (retries < maxRetries) {
+125:      try {
+126:        const response = await ai.models.generateContent({
+133:      } catch (e) {
+141:  const handleGenerateSong = async () => {
+151:    const genreInstructions: Record<string, string> = {
+160:    1. الأسلوب: ${genreInstructions[genre]}
+165:${metaTags}
+187:    try {
+188:      const result = await callAI(`قم بترتيب وتأليف الأغنية باحترافية بناءً على: "${inputText}"`, sysPrompt);
+190:    } catch (err: any) {
+192:    } finally {
+197:  const handleTashkeelOnly = async () => {
+210:    try {
+211:      const result = await callAI(`شكّل هذا النص بالعامية المصرية بدقة صوتية: "${inputText}"`, sysPrompt);
+214:    } catch (err: any) {
+216:    } finally {
+221:  const handleSpellCheckAndSpeak = async () => {
+230:    try {
+231:      const result = await callAI(`صحح هذا النص إملائياً وشكله للعامية: "${inputText}"`, sysPrompt);
+234:    } catch (err: any) {
+236:    } finally {
+241:  const handleWordSearch = async () => {
+250:    {
+252:        {"word": "الكلمة_بالتشكيل", "meaning": "معنى هذا التشكيل (مصري أو فصحى) ومتى يستخدم باختصار"}
+258:    try {
+259:      const result = await callAI(`هات كل احتمالات التشكيل للكلمة دي: "${searchWord}"`, sysPrompt, false, true);
+262:    } catch (err: any) {
+263:      setWordSuggestions([{ word: "خطأ", meaning: "حدث خطأ أثناء جلب التشكيلات، حاول مجدداً." }]);
+264:    } finally {
+269:  const handleGenerateMusicPrompt = async () => {
+288:    try {
+289:      const result = await callAI(`اكتب برومبت موسيقي احترافي لـ Suno بناءً على: "${inputText}" ونوع "${genre}"`, sysPrompt);
+291:    } catch (err: any) {
+293:    } finally {
+298:  const handleAudioUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+299:    if (e.target.files && e.target.files[0]) {
+307:  const handleFindRhymes = async () => {
+314:    {
+318:    try {
+319:      const result = await callAI(`هات كلمات لها نفس قافية: "${rhymeWord}"`, sysPrompt, false, true);
+321:      setOutputResult(`القوافي المقترحة لـ "${rhymeWord}":\n${parsedData.rhymes.join('\n')}`);
+323:    } catch (err: any) {
+325:    } finally {
+330:  const handleRewriteLine = async () => {
+338:    try {
+339:      const result = await callAI(`أعد صياغة هذا السطر: "${lineToRewrite}"\n\nمع الحفاظ على القافية والوزن في سياق هذه الأغنية: "${inputText}"`, sysPrompt);
+340:      setOutputResult(`السطر الجديد:\n${result}`);
+342:    } catch (err: any) {
+344:    } finally {
+349:  const processAudio = async (mode: 'general' | 'egyptian' | 'analyze_music') => {
+354:    try {
+355:      const base64Data = await new Promise<string>((resolve, reject) => {
+358:        reader.onload = () => {
+359:          if (typeof reader.result === 'string') {
+366:      const audioPart = { data: base64Data, mimeType: audioFile.type };
+371:      if (mode === 'egyptian') {
+376:      } else if (mode === 'analyze_music') {
+388:      } else {
+398:    } catch (err: any) {
+400:    } finally {
+405:  const copyToClipboard = () => {
+411:    try {
+415:    } catch (err) {}
+419:  const saveInput = () => {
+423:  const loadInput = () => {
+428:  const downloadOutput = () => {
+430:    const blob = new Blob([outputResult], { type: 'text/plain;charset=utf-8' });
+434:    a.download = `rika_output_${Date.now()}.txt`;
+441:  const downloadOutputDocx = async () => {
+443:    const doc = new Document({
+445:        {
+446:          properties: {},
+447:          children: outputResult.split('\n').map(line => new Paragraph({
+449:              new TextRun({
+463:    a.download = `rika_output_${Date.now()}.docx`;
+470:  const VirtualizedOutput = ({ text, type }: { text: string, type: string }) => {
+474:    const rowVirtualizer = useVirtualizer({
+482:        ref={parentRef} 
+484:        style={{ contain: 'strict' }}
+487:          style={{
+488:            height: `${rowVirtualizer.getTotalSize()}px`,
+493:          {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+497:            if (type === 'song') {
+498:              if (line.match(/^\[Style:.*\]|^\[Vocal Delivery:.*\]|^\[Pronunciation.*\]/i)) {
+499:                content = <span className="block text-[#00ffcc] font-mono text-xs mt-1 mb-1 bg-[#00ffcc]/10 p-1.5 rounded-md w-fit" dir="ltr">{line}</span>;
+500:              } else if (line.match(/^\[(.*?)\]$/)) {
+501:                content = <span className="block text-indigo-400 font-black mt-6 mb-2 text-sm tracking-widest uppercase bg-indigo-900/30 w-fit px-2 py-1 rounded">{line}</span>;
+502:              } else if (line.trim() === '') {
+504:              } else {
+505:                content = <span className="block mb-1 text-slate-100">{line}</span>;
+507:            } else if (type === 'music_prompt' || type === 'analysis') {
+508:              if (line.match(/^\[(.*?)\]/)) {
+509:                content = <span className="block text-amber-400 font-mono text-sm mt-2 mb-1 bg-amber-400/10 p-2 rounded-md border border-amber-400/20" dir="ltr">{line}</span>;
+510:              } else if (line.trim() === '') {
+512:              } else {
+513:                content = <span className="block mb-1 text-slate-100">{line}</span>;
+515:            } else {
+517:              else content = <span className="block mb-1 text-slate-100">{line}</span>;
+522:                key={virtualRow.index}
+523:                data-index={virtualRow.index}
+524:                ref={rowVirtualizer.measureElement}
+525:                style={{
+530:                  transform: `translateY(${virtualRow.start}px)`,
+533:                {content}
+542:  const LoadingIndicator = ({ task }: { task: string }) => (
+545:      <p className="text-indigo-300 font-bold animate-pulse">{task}...</p>
+553:        {/* Header */}
+589:             {[
+590:               { id: 'rap_egy', label: 'راب/تراب' },
+591:               { id: 'pop_egy', label: 'بوب' },
+592:               { id: 'shaabi', label: 'مهرجانات' },
+593:               { id: 'khaliji', label: 'خليجي' },
+594:               { id: 'romantic', label: 'رومانسي' }
+597:                  key={g.id} 
+598:                  onClick={() => setGenre(g.id)}
+599:                  className={`flex-1 md:flex-none px-4 py-2 rounded-lg text-xs md:text-sm font-bold transition-all duration-300 ${
+605:                 {g.label}
+611:        {/* Word Inspector Card */}
+615:              <Search size={18} />
+621:                value={searchWord}
+622:                onChange={(e) => setSearchWord(e.target.value)}
+627:                onClick={handleWordSearch}
+628:                disabled={isSearchingWord || !searchWord.trim()}
+631:                {isSearchingWord ? <RefreshCw size={16} className="animate-spin" /> : <BookOpen size={16} />}
+637:            {wordSuggestions && (
+639:                initial={{ opacity: 0, y: 20 }}
+640:                animate={{ opacity: 1, y: 0 }}
+641:                exit={{ opacity: 0, y: -20 }}
+644:                {wordSuggestions.suggestions && (
+646:                    {wordSuggestions.suggestions.map((item: any, index: number) => (
+647:                      <div key={index} className="flex justify-between items-center p-3 bg-[#09090b] rounded-xl border border-slate-800 hover:border-indigo-500/50 transition-colors">
+649:                          <span className="text-xl font-bold text-indigo-400 font-arabic">{item.word}</span>
+650:                          <p className="text-xs text-slate-400 mt-1">{item.meaning}</p>
+653:                          onClick={() => speakText(item.word)} 
+657:                          <Volume2 size={20} />
+665:                  {wordSuggestions.synonyms && wordSuggestions.synonyms.length > 0 && (
+669:                        {wordSuggestions.synonyms.map((s: string, i: number) => (
+670:                          <span key={i} className="px-2 py-1 bg-emerald-900/20 text-emerald-300 rounded text-xs">{s}</span>
+675:                  {wordSuggestions.antonyms && wordSuggestions.antonyms.length > 0 && (
+679:                        {wordSuggestions.antonyms.map((a: string, i: number) => (
+680:                          <span key={i} className="px-2 py-1 bg-red-900/20 text-red-300 rounded text-xs">{a}</span>
+690:        {/* Input Area */}
+693:          {/* Audio Upload Section */}
+698:                  onClick={() => fileInputRef.current?.click()}
+701:                  <Upload size={18} /> {audioFile ? 'تغيير الملف الصوتي' : 'رفع ملف صوتي (أغنية/مقطع)'}
+705:                  ref={fileInputRef} 
+706:                  onChange={handleAudioUpload} 
+710:                {audioFile && (
+712:                    <Check size={14} /> {audioFile.name}
+717:              {audioFile && (
+720:                    onClick={() => processAudio('general')}
+721:                    disabled={isLoading}
+724:                    <FileAudio size={18} /> تفريغ (عام)
+727:                    onClick={() => processAudio('egyptian')}
+728:                    disabled={isLoading}
+731:                    <FileAudio size={18} /> تفريغ (مصري)
+734:                    onClick={() => processAudio('analyze_music')}
+735:                    disabled={isLoading}
+738:                    <Music size={18} /> تحليل وبرومبت Suno
+745:          {/* New Tools Section */}
+750:                value={rhymeWord}
+751:                onChange={(e) => setRhymeWord(e.target.value)}
+756:                onClick={handleFindRhymes}
+757:                disabled={isLoading}
+766:                value={lineToRewrite}
+767:                onChange={(e) => setLineToRewrite(e.target.value)}
+772:                onClick={handleRewriteLine}
+773:                disabled={isLoading}
+786:              <button onClick={loadInput} className="text-slate-600 hover:text-indigo-400 transition-colors p-1" title="استرجاع المحفوظ">
+787:                <FolderOpen size={18} />
+789:              <button onClick={saveInput} className="text-slate-600 hover:text-emerald-400 transition-colors p-1" title="حفظ النص">
+790:                <Save size={18} />
+792:              <button onClick={() => setInputText('')} className="text-slate-600 hover:text-red-400 transition-colors p-1" title="مسح">
+793:                <Trash2 size={18} />
+799:            value={inputText}
+800:            onChange={(e) => setInputText(e.target.value)}
+805:          {/* Example Prompts */}
+808:            {[
+809:              { label: 'أغنية: كفاح القاهرة', text: 'قصة شاب بيكافح في زحمة القاهرة وعنده طموح كبير' },
+810:              { label: 'تشكيل: نص عامي', text: 'انا رحت الشغل الصبح بدري وكان الجو برد جدا ومفيش مواصلات' },
+811:              { label: 'تصحيح: أخطاء إملائية', text: 'امبارح روحت السنما وشفت فلم حلو اوي بس الكرسي كان مش مريح' },
+812:              { label: 'برومبت: مهرجان شعبي', text: 'عايز برومبت لمهرجان شعبي مصري قوي فيه طبلة وكهربا' }
+815:                key={i} 
+816:                onClick={() => setInputText(ex.text)}
+819:                {ex.label}
+824:          {/* Action Buttons Grid */}
+827:              onClick={toggleListening}
+828:              className={`col-span-1 py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all border-2 ${
+834:              {isListening ? <MicOff size={24} /> : <Mic size={24} />}
+835:              <span className="text-sm">{isListening ? 'إيقاف التسجيل' : 'بدء التسجيل الصوتي'}</span>
+839:              onClick={handleTashkeelOnly}
+840:              disabled={isLoading || !inputText.trim()}
+843:              <Feather size={18} /> تشكيل ونطق
+847:              onClick={handleSpellCheckAndSpeak}
+848:              disabled={isLoading || !inputText.trim()}
+851:              <Volume2 size={18} /> تصحيح ونطق
+855:              onClick={handleGenerateMusicPrompt}
+856:              disabled={isLoading || !inputText.trim()}
+859:              <Headphones size={18} /> برومبت Suno
+863:              onClick={handleGenerateSong}
+864:              disabled={isLoading || !inputText.trim()}
+867:              <Music size={18} /> تأليف أغنية
+872:        {/* Error Alert */}
+873:        {error && (
+875:            <AlertCircle size={20} className="shrink-0" />
+876:            <span className="text-sm font-bold">{error}</span>
+880:        {/* Output Area */}
+881:        {(outputResult || isLoading) && (
+886:                <PlaySquare size={20} className="text-indigo-400" />
+890:                {(outputType === 'spellcheck' || outputType === 'tashkeel') && !isLoading && (
+892:                    onClick={() => speakText(outputResult)}
+896:                    <Volume2 size={18} /> إعد النطق
+900:                  onClick={copyToClipboard}
+901:                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all duration-300 ${
+907:                  {copyStatus ? <><Check size={18} /> <span className="hidden md:inline">تم النسخ!</span></> : <><Copy size={18} /> <span className="hidden md:inline">نسخ</span></>}
+910:                  onClick={downloadOutput}
+914:                  <Download size={18} /> <span className="hidden md:inline">TXT</span>
+917:                  onClick={downloadOutputDocx}
+921:                  <Download size={18} /> <span className="hidden md:inline">DOCX</span>
+924:                  onClick={() => setOutputResult('')}
+928:                  <X size={18} /> <span className="hidden md:inline">إغلاق</span>
+934:              {isLoading ? (
+935:                <LoadingIndicator task={
+944:                  <VirtualizedOutput text={outputResult} type={outputType} />
+949:            {outputType === 'song' && (
+951:                <Info size={18} className="shrink-0 mt-0.5" />
+962:      <style dangerouslySetInnerHTML={{ __html: `
+965:        .font-arabic { font-family: 'Noto Sans Arabic', sans-serif; }
+966:        .font-ruqaa { font-family: 'Aref Ruqaa', serif; }
+967:        .font-pacifico { font-family: 'Pacifico', cursive; }
+969:        .neon-ar {
+981:        .neon-en {
+991:        body { font-family: 'Noto Sans Arabic', sans-serif; background-color: #09090b; }
+992:        ::selection { background: #bc13fe; color: white; }
+993:        textarea:focus, input:focus { outline: none; }
+1:import React, { useState, useEffect, useRef } from 'react';
+8:} from 'lucide-react';
+9:import { motion, AnimatePresence } from 'motion/react';
+10:import { GoogleGenAI } from '@google/genai';
+11:import { Document, Packer, Paragraph, TextRun } from 'docx';
+12:import { useVirtualizer } from '@tanstack/react-virtual';
+50:        }
+53:        }
+54:      };
+58:      };
+60:    }
+61:  }, []);
+66:    } else {
+71:      } catch (e) {
+73:      }
+74:    }
+75:  };
+81:    }
+93:    }
+98:  };
+100:  const callAI = async (promptText: string, systemInstruction: string, useSearch = false, expectJson = false, audioData?: { data: string, mimeType: string }) => {
+101:    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+107:    };
+110:      config.tools = [{ googleSearch: {} }];
+111:    }
+115:    }
+119:          { inlineData: { data: audioData.data, mimeType: audioData.mimeType } },
+130:        });
+133:      } catch (e) {
+136:      }
+137:    }
+139:  };
+157:    };
+160:    1. الأسلوب: ${genreInstructions[genre]}
+165:${metaTags}
+188:      const result = await callAI(`قم بترتيب وتأليف الأغنية باحترافية بناءً على: "${inputText}"`, sysPrompt);
+190:    } catch (err: any) {
+192:    } finally {
+194:    }
+195:  };
+211:      const result = await callAI(`شكّل هذا النص بالعامية المصرية بدقة صوتية: "${inputText}"`, sysPrompt);
+214:    } catch (err: any) {
+216:    } finally {
+218:    }
+219:  };
+231:      const result = await callAI(`صحح هذا النص إملائياً وشكله للعامية: "${inputText}"`, sysPrompt);
+234:    } catch (err: any) {
+236:    } finally {
+238:    }
+239:  };
+252:        {"word": "الكلمة_بالتشكيل", "meaning": "معنى هذا التشكيل (مصري أو فصحى) ومتى يستخدم باختصار"}
+256:    }`;
+259:      const result = await callAI(`هات كل احتمالات التشكيل للكلمة دي: "${searchWord}"`, sysPrompt, false, true);
+262:    } catch (err: any) {
+263:      setWordSuggestions([{ word: "خطأ", meaning: "حدث خطأ أثناء جلب التشكيلات، حاول مجدداً." }]);
+264:    } finally {
+266:    }
+267:  };
+289:      const result = await callAI(`اكتب برومبت موسيقي احترافي لـ Suno بناءً على: "${inputText}" ونوع "${genre}"`, sysPrompt);
+291:    } catch (err: any) {
+293:    } finally {
+295:    }
+296:  };
+301:    }
+302:  };
+316:    }`;
+319:      const result = await callAI(`هات كلمات لها نفس قافية: "${rhymeWord}"`, sysPrompt, false, true);
+321:      setOutputResult(`القوافي المقترحة لـ "${rhymeWord}":\n${parsedData.rhymes.join('\n')}`);
+323:    } catch (err: any) {
+325:    } finally {
+327:    }
+328:  };
+339:      const result = await callAI(`أعد صياغة هذا السطر: "${lineToRewrite}"\n\nمع الحفاظ على القافية والوزن في سياق هذه الأغنية: "${inputText}"`, sysPrompt);
+340:      setOutputResult(`السطر الجديد:\n${result}`);
+342:    } catch (err: any) {
+344:    } finally {
+346:    }
+347:  };
+361:          }
+362:        };
+364:      });
+366:      const audioPart = { data: base64Data, mimeType: audioFile.type };
+376:      } else if (mode === 'analyze_music') {
+388:      } else {
+394:      }
+398:    } catch (err: any) {
+400:    } finally {
+402:    }
+403:  };
+415:    } catch (err) {}
+417:  };
+421:  };
+426:  };
+430:    const blob = new Blob([outputResult], { type: 'text/plain;charset=utf-8' });
+434:    a.download = `rika_output_${Date.now()}.txt`;
+439:  };
+446:          properties: {},
+452:              })
+454:          })),
+455:        },
+457:    });
+463:    a.download = `rika_output_${Date.now()}.docx`;
+468:  };
+470:  const VirtualizedOutput = ({ text, type }: { text: string, type: string }) => {
+478:    });
+482:        ref={parentRef} 
+484:        style={{ contain: 'strict' }}
+488:            height: `${rowVirtualizer.getTotalSize()}px`,
+491:          }}
+499:                content = <span className="block text-[#00ffcc] font-mono text-xs mt-1 mb-1 bg-[#00ffcc]/10 p-1.5 rounded-md w-fit" dir="ltr">{line}</span>;
+500:              } else if (line.match(/^\[(.*?)\]$/)) {
+501:                content = <span className="block text-indigo-400 font-black mt-6 mb-2 text-sm tracking-widest uppercase bg-indigo-900/30 w-fit px-2 py-1 rounded">{line}</span>;
+502:              } else if (line.trim() === '') {
+504:              } else {
+505:                content = <span className="block mb-1 text-slate-100">{line}</span>;
+506:              }
+507:            } else if (type === 'music_prompt' || type === 'analysis') {
+509:                content = <span className="block text-amber-400 font-mono text-sm mt-2 mb-1 bg-amber-400/10 p-2 rounded-md border border-amber-400/20" dir="ltr">{line}</span>;
+510:              } else if (line.trim() === '') {
+512:              } else {
+513:                content = <span className="block mb-1 text-slate-100">{line}</span>;
+514:              }
+515:            } else {
+517:              else content = <span className="block mb-1 text-slate-100">{line}</span>;
+518:            }
+522:                key={virtualRow.index}
+523:                data-index={virtualRow.index}
+524:                ref={rowVirtualizer.measureElement}
+530:                  transform: `translateY(${virtualRow.start}px)`,
+531:                }}
+533:                {content}
+536:          })}
+540:  };
+542:  const LoadingIndicator = ({ task }: { task: string }) => (
+545:      <p className="text-indigo-300 font-bold animate-pulse">{task}...</p>
+553:        {/* Header */}
+590:               { id: 'rap_egy', label: 'راب/تراب' },
+591:               { id: 'pop_egy', label: 'بوب' },
+592:               { id: 'shaabi', label: 'مهرجانات' },
+593:               { id: 'khaliji', label: 'خليجي' },
+594:               { id: 'romantic', label: 'رومانسي' }
+597:                  key={g.id} 
+598:                  onClick={() => setGenre(g.id)}
+603:                  }`}
+605:                 {g.label}
+607:             ))}
+611:        {/* Word Inspector Card */}
+615:              <Search size={18} />
+621:                value={searchWord}
+622:                onChange={(e) => setSearchWord(e.target.value)}
+627:                onClick={handleWordSearch}
+628:                disabled={isSearchingWord || !searchWord.trim()}
+631:                {isSearchingWord ? <RefreshCw size={16} className="animate-spin" /> : <BookOpen size={16} />}
+639:                initial={{ opacity: 0, y: 20 }}
+640:                animate={{ opacity: 1, y: 0 }}
+641:                exit={{ opacity: 0, y: -20 }}
+647:                      <div key={index} className="flex justify-between items-center p-3 bg-[#09090b] rounded-xl border border-slate-800 hover:border-indigo-500/50 transition-colors">
+649:                          <span className="text-xl font-bold text-indigo-400 font-arabic">{item.word}</span>
+650:                          <p className="text-xs text-slate-400 mt-1">{item.meaning}</p>
+653:                          onClick={() => speakText(item.word)} 
+657:                          <Volume2 size={20} />
+660:                    ))}
+662:                )}
+670:                          <span key={i} className="px-2 py-1 bg-emerald-900/20 text-emerald-300 rounded text-xs">{s}</span>
+671:                        ))}
+674:                  )}
+680:                          <span key={i} className="px-2 py-1 bg-red-900/20 text-red-300 rounded text-xs">{a}</span>
+681:                        ))}
+684:                  )}
+687:            )}
+690:        {/* Input Area */}
+693:          {/* Audio Upload Section */}
+698:                  onClick={() => fileInputRef.current?.click()}
+701:                  <Upload size={18} /> {audioFile ? 'تغيير الملف الصوتي' : 'رفع ملف صوتي (أغنية/مقطع)'}
+705:                  ref={fileInputRef} 
+706:                  onChange={handleAudioUpload} 
+712:                    <Check size={14} /> {audioFile.name}
+714:                )}
+720:                    onClick={() => processAudio('general')}
+721:                    disabled={isLoading}
+724:                    <FileAudio size={18} /> تفريغ (عام)
+727:                    onClick={() => processAudio('egyptian')}
+728:                    disabled={isLoading}
+731:                    <FileAudio size={18} /> تفريغ (مصري)
+734:                    onClick={() => processAudio('analyze_music')}
+735:                    disabled={isLoading}
+738:                    <Music size={18} /> تحليل وبرومبت Suno
+741:              )}
+745:          {/* New Tools Section */}
+750:                value={rhymeWord}
+751:                onChange={(e) => setRhymeWord(e.target.value)}
+756:                onClick={handleFindRhymes}
+757:                disabled={isLoading}
+766:                value={lineToRewrite}
+767:                onChange={(e) => setLineToRewrite(e.target.value)}
+772:                onClick={handleRewriteLine}
+773:                disabled={isLoading}
+786:              <button onClick={loadInput} className="text-slate-600 hover:text-indigo-400 transition-colors p-1" title="استرجاع المحفوظ">
+787:                <FolderOpen size={18} />
+789:              <button onClick={saveInput} className="text-slate-600 hover:text-emerald-400 transition-colors p-1" title="حفظ النص">
+790:                <Save size={18} />
+792:              <button onClick={() => setInputText('')} className="text-slate-600 hover:text-red-400 transition-colors p-1" title="مسح">
+793:                <Trash2 size={18} />
+799:            value={inputText}
+800:            onChange={(e) => setInputText(e.target.value)}
+805:          {/* Example Prompts */}
+809:              { label: 'أغنية: كفاح القاهرة', text: 'قصة شاب بيكافح في زحمة القاهرة وعنده طموح كبير' },
+810:              { label: 'تشكيل: نص عامي', text: 'انا رحت الشغل الصبح بدري وكان الجو برد جدا ومفيش مواصلات' },
+811:              { label: 'تصحيح: أخطاء إملائية', text: 'امبارح روحت السنما وشفت فلم حلو اوي بس الكرسي كان مش مريح' },
+812:              { label: 'برومبت: مهرجان شعبي', text: 'عايز برومبت لمهرجان شعبي مصري قوي فيه طبلة وكهربا' }
+815:                key={i} 
+816:                onClick={() => setInputText(ex.text)}
+819:                {ex.label}
+821:            ))}
+824:          {/* Action Buttons Grid */}
+827:              onClick={toggleListening}
+832:              }`}
+834:              {isListening ? <MicOff size={24} /> : <Mic size={24} />}
+835:              <span className="text-sm">{isListening ? 'إيقاف التسجيل' : 'بدء التسجيل الصوتي'}</span>
+839:              onClick={handleTashkeelOnly}
+840:              disabled={isLoading || !inputText.trim()}
+843:              <Feather size={18} /> تشكيل ونطق
+847:              onClick={handleSpellCheckAndSpeak}
+848:              disabled={isLoading || !inputText.trim()}
+851:              <Volume2 size={18} /> تصحيح ونطق
+855:              onClick={handleGenerateMusicPrompt}
+856:              disabled={isLoading || !inputText.trim()}
+859:              <Headphones size={18} /> برومبت Suno
+863:              onClick={handleGenerateSong}
+864:              disabled={isLoading || !inputText.trim()}
+867:              <Music size={18} /> تأليف أغنية
+872:        {/* Error Alert */}
+875:            <AlertCircle size={20} className="shrink-0" />
+876:            <span className="text-sm font-bold">{error}</span>
+878:        )}
+880:        {/* Output Area */}
+886:                <PlaySquare size={20} className="text-indigo-400" />
+892:                    onClick={() => speakText(outputResult)}
+896:                    <Volume2 size={18} /> إعد النطق
+898:                )}
+900:                  onClick={copyToClipboard}
+905:                  }`}
+907:                  {copyStatus ? <><Check size={18} /> <span className="hidden md:inline">تم النسخ!</span></> : <><Copy size={18} /> <span className="hidden md:inline">نسخ</span></>}
+910:                  onClick={downloadOutput}
+914:                  <Download size={18} /> <span className="hidden md:inline">TXT</span>
+917:                  onClick={downloadOutputDocx}
+921:                  <Download size={18} /> <span className="hidden md:inline">DOCX</span>
+924:                  onClick={() => setOutputResult('')}
+928:                  <X size={18} /> <span className="hidden md:inline">إغلاق</span>
+941:                } />
+944:                  <VirtualizedOutput text={outputResult} type={outputType} />
+946:              )}
+951:                <Info size={18} className="shrink-0 mt-0.5" />
+956:            )}
+958:        )}
+965:        .font-arabic { font-family: 'Noto Sans Arabic', sans-serif; }
+966:        .font-ruqaa { font-family: 'Aref Ruqaa', serif; }
+967:        .font-pacifico { font-family: 'Pacifico', cursive; }
+979:        }
+989:        }
+991:        body { font-family: 'Noto Sans Arabic', sans-serif; background-color: #09090b; }
+992:        ::selection { background: #bc13fe; color: white; }
+993:        textarea:focus, input:focus { outline: none; }
+994:      `}} />
+997:};
