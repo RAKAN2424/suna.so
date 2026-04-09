@@ -1,1 +1,77 @@
 @import "tailwindcss";
+
+@theme {
+  --font-arabic: "Noto Sans Arabic", sans-serif;
+  --font-ruqaa: "Aref Ruqaa", serif;
+  --font-pacifico: "Pacifico", cursive;
+}
+
+:root {
+  /* Spacing System (4px base) */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-12: 3rem;
+
+  /* Fluid Typography */
+  --text-xs: clamp(0.75rem, 0.7rem + 0.25vw, 0.875rem);
+  --text-sm: clamp(0.875rem, 0.8rem + 0.3vw, 1rem);
+  --text-base: clamp(1rem, 0.95rem + 0.4vw, 1.125rem);
+  --text-lg: clamp(1.125rem, 1.05rem + 0.5vw, 1.25rem);
+  --text-xl: clamp(1.25rem, 1.15rem + 0.6vw, 1.5rem);
+  --text-2xl: clamp(1.5rem, 1.4rem + 0.8vw, 2rem);
+  --text-3xl: clamp(2rem, 1.8rem + 1vw, 3rem);
+  --text-4xl: clamp(2.5rem, 2.2rem + 1.5vw, 4rem);
+
+  /* Light Mode Colors (OKLCH) */
+  --bg-main: oklch(0.98 0.01 240);
+  --bg-surface: oklch(1 0 0);
+  --bg-input: oklch(0.97 0.01 240);
+  --text-main: oklch(0.2 0.02 240);
+  --text-muted: oklch(0.45 0.02 240);
+  --accent-primary: oklch(0.6 0.18 250);
+  --accent-secondary: oklch(0.65 0.15 180);
+  --border-color: oklch(0.9 0.01 240 / 0.5);
+  --shadow-color: oklch(0 0 0 / 0.05);
+}
+
+[data-theme="dark"] {
+  /* Dark Mode Colors (OKLCH) */
+  --bg-main: oklch(0.15 0.01 240);
+  --bg-surface: oklch(0.18 0.02 240);
+  --bg-input: oklch(0.12 0.01 240);
+  --text-main: oklch(0.9 0.01 240);
+  --text-muted: oklch(0.7 0.02 240);
+  --accent-primary: oklch(0.7 0.15 250);
+  --accent-secondary: oklch(0.75 0.12 180);
+  --border-color: oklch(1 1 1 / 0.1);
+  --shadow-color: oklch(0 0 0 / 0.3);
+}
+
+body {
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  font-family: var(--font-arabic);
+  transition: background-color 0.3s ease, color 0.3s ease;
+  min-height: 100dvh;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 10px;
+}
+
+.neon-ar {
+  text-shadow: 0 0 10px var(--accent-primary), 0 0 20px var(--accent-primary);
+}
