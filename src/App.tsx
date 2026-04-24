@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Mic, MicOff, Copy, Trash2, Music, Sparkles, 
   RefreshCw, Check, AlertCircle, PlaySquare, Info, 
-  Feather, Volume2, Search, BookOpen,
+  Feather, Volume2, VolumeX, Search, BookOpen,
   Download, Save, FolderOpen, X, Headphones,
   Upload, FileAudio, Moon, Sun, Languages, History as HistoryIcon
 } from 'lucide-react';
@@ -33,6 +33,11 @@ const App = () => {
   const [searchWord, setSearchWord] = useState('');
   const [wordSuggestions, setWordSuggestions] = useState<any>(null); 
   const [isSearchingWord, setIsSearchingWord] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+
+  const [showSunoModal, setShowSunoModal] = useState(false);
+  const [sunoMood, setSunoMood] = useState('');
+  const [sunoGenre, setSunoGenre] = useState('');
 
   const [isListening, setIsListening] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -156,7 +161,18 @@ const App = () => {
 
     utterance.rate = 0.85; 
     
+    utterance.onstart = () => setIsSpeaking(true);
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+
     window.speechSynthesis.speak(utterance);
+  };
+
+  const stopSpeaking = () => {
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+    }
   };
 
   const callAI = async (promptText: string, systemInstruction: string, useSearch = false, expectJson = false, audioData?: { data: string, mimeType: string }) => {
@@ -347,29 +363,62 @@ ${PHONETIC_RULES}
   };
 
   const handleGenerateMusicPrompt = async () => {
-    if (!inputText.trim()) return;
+    if (!sunoGenre.trim() || !sunoMood.trim()) {
+      setError(language === 'ar' ? 'الرجاء اختيار نوع الموسيقى وكتابة الحالة.' : 'Please select genre and write mood.');
+      return;
+    }
+    setShowSunoModal(false);
     setIsLoading(true); setError(null); setOutputResult(''); setOutputType('music_prompt');
 
-    const sysPrompt = `أنت خبير في هندسة البرومبتات (Prompt Engineering) لأدوات توليد الموسيقى بالذكاء الاصطناعي مثل Suno AI و Udio، ومتخصص في الموسيقى المصرية الحضرية.
-    مهمتك: تحويل فكرة المستخدم إلى برومبت إنجليزي تقني دقيق يضمن خروج الموسيقى بروح مصرية أصلية.
+    const sysPrompt = `أنت خبير في هندسة البرومبتات (Prompt Engineering) لأدوات توليد الموسيقى بالذكاء الاصطناعي مثل Suno AI و Udio.
+    مهمتك: تحويل فكرة المستخدم و/أو كلماته إلى برومبت إنجليزي تقني دقيق.
     
-    الأنماط الخاصة:
-    - المهرجانات (Mahraganat): استخدم (Egyptian Mahraganat, Street Electro, Heavy 808 Darbuka, Aggressive Synth leads, Auto-tune vocals, 140-150 BPM, Cairo Street vibe, Maqsum rhythm, Shrill synthesizer).
-    - التراب الشعبي (Trap Shaabi): استخدم (Egyptian Trap Shaabi, Dark cinematic atmosphere, Heavy bass, Trap hats mixed with Darbuka, Melodic slang vocals, Mahraganat elements, Urban Cairo sound).
-    - الشعبي (Shaabi): استخدم (Traditional Egyptian Shaabi, Accordion, Kawala, Live percussion, Wedding style, Soulful street singing, Rhythmic, 110-120 BPM).
+    النوع الموسيقي المطلوب (Genre): ${sunoGenre}
+    الحالة أو الكلمات (Mood/Context): ${sunoMood}
+    ${inputText.trim() ? `كلمات الأغنية (Lyrics):\n${inputText.trim()}` : ''}
     
     يجب أن يتضمن البرومبت:
-    1. [Style]: وصف دقيق للنمط (مثلاً: Modern Egyptian Mahraganat).
-    2. [Instruments]: الآلات (Darbuka, Synth, 808, Accordion).
-    3. [Vocal Style]: (Auto-tuned, Street-style, Soulful).
-    4. [Atmosphere]: (High energy, Dark, Festive).
+    1. [Style]: وصف دقيق للنمط.
+    2. [Instruments]: الآلات المناسبة لهذا النوع.
+    3. [Vocal Style]: أسلوب الغناء.
+    4. [Atmosphere]: الجو العام.
     
-    أخرج النتيجة كبرومبت جاهز للنسخ واللصق في Suno/Udio. أضف شرحاً بسيطاً بالعربية لما يفعله هذا البرومبت.`;
+    أخرج النتيجة كبرومبت جاهز للنسخ واللصق في Suno/Udio (بالإنجليزية). أضف شرحاً بسيطاً بالعربية لما يفعله هذا البرومبت.`;
 
     try {
-      const result = await callAI(language === 'ar' ? `اكتب برومبت موسيقي احترافي لـ Suno بناءً على: "${inputText}" ونوع "${genre}"` : `Write a professional Suno music prompt based on: "${inputText}" and genre "${genre}"`, sysPrompt);
+      const result = await callAI("أكتب لي برومبت Suno احترافي بناءً على المعطيات", sysPrompt);
       setOutputResult(result);
-      addToHistory('music_prompt', inputText, result);
+      addToHistory('music_prompt', `Genre: ${sunoGenre}, Mood: ${sunoMood}`, result);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleFormatLyrics = async () => {
+    const textToAnalyze = outputResult.trim() || inputText.trim();
+    if (!textToAnalyze) return;
+    setIsLoading(true); setError(null); setOutputType('lyrics_format');
+
+    const sysPrompt = `أنت شاعر ومنسق أغاني محترف.
+    مهمتك: أخذ الكلمات التي يعطيها لك المستخدم وتقسيمها وتنسيقها بشكل احترافي لتكون جاهزة للغناء أو لهندسة الصوت (Suno AI وغيره).
+    قم بتقسيم الأغنية إلى مقاطع واضحة باستخدام الهيكل التالي باللغة الإنجليزية كمؤشرات بين الأقواس المربعة:
+    [Intro]
+    [Verse 1]
+    [Pre-Chorus] (إذا لزم الأمر)
+    [Chorus]
+    [Verse 2]
+    [Chorus 2]
+    [Bridge] (إذا لزم الأمر)
+    [Outro]
+    
+    حافظ على الكلمات الأصلية بقدر الإمكان ولكن قسمها بشكل منطقي وموزون.`;
+
+    try {
+      const result = await callAI(textToAnalyze, sysPrompt);
+      setOutputResult(result);
+      addToHistory('lyrics_format', textToAnalyze.substring(0, 50) + "...", result);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -499,18 +548,18 @@ ${PHONETIC_RULES}
         أخرج النص المفرغ والمشكل فقط باحترافية تامة.`;
         promptText = "قم بتفريغ هذا الصوت واكتبه بالعامية المصرية الأصلية مع التشكيل الدقيق جداً.";
       } else if (mode === 'analyze_music') {
-        sysPrompt = `أنت منتج موسيقي وخبير (A&R) متخصص في الموسيقى المصرية الحديثة (مهرجانات، تراب شعبي، راب).
-        مهمتك هي تحليل المقطع الصوتي المرفق بدقة تقنية عالية:
-        1. تفريغ الكلمات بدقة (بالعامية المصرية).
-        2. تحديد النوع الموسيقي بدقة (مثلاً: تراب شعبي، مهرجان مقسوم، شعبي دراما، راب سين).
+        sysPrompt = `أنت منتج موسيقي وخبير (A&R) متخصص في جميع أنواع الموسيقى.
+        مهمتك هي تحليل المقطع الصوتي المرفق بدقة تقنية عالية جداً:
+        1. تفريغ الكلمات بدقة.
+        2. تحديد النوع الموسيقي بدقة (الجنر).
         3. تحليل 'الوايب' (Vibe)، الآلات المستخدمة، وسرعة الإيقاع (BPM).
-        4. كتابة برومبت Suno AI إنجليزي 'تقني محترف' يعيد إنتاج نفس الروح والتوزيع بدقة مذهلة.
+        4. عمل تحليل في صيغة برومبت لموقع سونو (Suno AI) باللغة الإنجليزية. **يجب** أن يكون البرومبت مكونًا من حوالي 1000 حرف (مع حساب المسافات والنقاط في الكاركترز)، ويجب أن يصف الأغنية بالتفصيل الممل من حيث الجو والآلات والأسلوب الصوتي ليقوم Suno بعمل توليد دقيق لنفس الروح.
         
         أخرج النتيجة بتنسيق واضح ومقسم إلى:
-        - الكلمات المفرغة (بالعامية المصرية)
+        - الكلمات المفرغة
         - التحليل الموسيقي التقني
-        - [Suno Prompt: اكتب البرومبت الإنجليزي هنا]`;
-        promptText = "حلل المقطع ده باحترافية، واكتب كلماته بالعامية، وطلع لي برومبت Suno جبار بنفس الروح.";
+        - [Suno Prompt: اكتب البرومبت الإنجليزي الطويل والمفصل هنا]`;
+        promptText = "حلل المقطع ده باحترافية، واكتب كلماته، واعمل لي برومبت Suno دقيق جداً مكون من 1000 حرف بيشرح المزيكا دي اتعملت ازاي.";
       } else {
         sysPrompt = `أنت خبير في تفريغ الصوتيات بجميع اللغات واللهجات.
         مهمتك: استمع للملف الصوتي، تعرف على لغته أو لهجته، واكتب الكلام بدقة إملائية.
@@ -867,13 +916,23 @@ ${PHONETIC_RULES}
                           <span className={`text-xl font-bold ${darkMode ? 'text-indigo-400' : 'text-indigo-600'} font-arabic`}>{item.word}</span>
                           <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'} mt-1`}>{item.meaning}</p>
                         </div>
-                        <button 
-                          onClick={() => speakText(item.word)} 
-                          className={`p-2.5 ${darkMode ? 'bg-indigo-900/30 text-indigo-300 hover:bg-indigo-600' : 'bg-indigo-100 text-indigo-600 hover:bg-indigo-600'} rounded-xl hover:text-white transition-colors flex-shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center`}
-                          aria-label={t.speakBtn}
-                        >
-                          <Volume2 size={20} />
-                        </button>
+                        {isSpeaking ? (
+                          <button 
+                            onClick={stopSpeaking} 
+                            className={`p-2.5 ${darkMode ? 'bg-red-900/30 text-red-500 hover:bg-red-600/50' : 'bg-red-100 text-red-600 hover:bg-red-200'} rounded-xl hover:text-white transition-colors flex-shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center`}
+                            aria-label={t.stopSpeakBtn}
+                          >
+                            <VolumeX size={20} />
+                          </button>
+                        ) : (
+                          <button 
+                            onClick={() => speakText(item.word)} 
+                            className={`p-2.5 ${darkMode ? 'bg-indigo-900/30 text-indigo-300 hover:bg-indigo-600' : 'bg-indigo-100 text-indigo-600 hover:bg-indigo-600'} rounded-xl hover:text-white transition-colors flex-shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center`}
+                            aria-label={t.speakBtn}
+                          >
+                            <Volume2 size={20} />
+                          </button>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -1114,8 +1173,8 @@ ${PHONETIC_RULES}
             </button>
 
             <button 
-              onClick={handleGenerateMusicPrompt}
-              disabled={isLoading || !inputText.trim()}
+              onClick={() => setShowSunoModal(true)}
+              disabled={isLoading || (!inputText.trim() && !outputResult.trim() && !audioFile)}
               className="col-span-1 py-3.5 bg-amber-600 hover:bg-amber-500 text-white rounded-2xl font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50 transition-all shadow-lg shadow-amber-500/20 min-h-[56px]"
             >
               <Headphones size={18} /> {t.sunoPromptBtn}
@@ -1127,6 +1186,14 @@ ${PHONETIC_RULES}
               className="col-span-1 py-3.5 bg-purple-600 hover:bg-purple-500 text-white rounded-2xl font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50 transition-all shadow-lg shadow-purple-500/20 min-h-[56px]"
             >
               <Music size={18} /> {t.analyzeLyricsBtn}
+            </button>
+
+            <button 
+              onClick={handleFormatLyrics}
+              disabled={isLoading || (!inputText.trim() && !outputResult.trim())}
+              className="col-span-1 py-3.5 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50 transition-all shadow-lg shadow-blue-500/20 min-h-[56px]"
+            >
+              <BookOpen size={18} /> {t.formatLyricsBtn}
             </button>
 
             <button 
@@ -1158,13 +1225,23 @@ ${PHONETIC_RULES}
               </div>
               <div className="flex gap-2">
                 {(outputType === 'spellcheck' || outputType === 'tashkeel') && !isLoading && (
-                  <button 
-                    onClick={() => speakText(outputResult)}
-                    className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold ${darkMode ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/30' : 'bg-emerald-100 text-emerald-600 border-emerald-200 hover:bg-emerald-200'} border transition-all min-h-[44px]`}
-                    aria-label={t.speakBtn}
-                  >
-                    <Volume2 size={18} /> {t.speakBtn}
-                  </button>
+                  isSpeaking ? (
+                    <button 
+                      onClick={stopSpeaking}
+                      className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold ${darkMode ? 'bg-red-500/20 text-red-500 border-red-500/30 hover:bg-red-500/30' : 'bg-red-100 text-red-600 border-red-200 hover:bg-red-200'} border transition-all min-h-[44px]`}
+                      aria-label={t.stopSpeakBtn}
+                    >
+                      <VolumeX size={18} /> {t.stopSpeakBtn}
+                    </button>
+                  ) : (
+                    <button 
+                      onClick={() => speakText(outputResult)}
+                      className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold ${darkMode ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/30' : 'bg-emerald-100 text-emerald-600 border-emerald-200 hover:bg-emerald-200'} border transition-all min-h-[44px]`}
+                      aria-label={t.speakBtn}
+                    >
+                      <Volume2 size={18} /> {t.speakBtn}
+                    </button>
+                  )
                 )}
                 <button 
                   onClick={copyToClipboard}
@@ -1326,6 +1403,68 @@ ${PHONETIC_RULES}
         )}
 
       </div>
+
+      <AnimatePresence>
+        {showSunoModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm rtl:text-right font-arabic">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className={`w-full max-w-lg overflow-hidden rounded-3xl shadow-2xl ${darkMode ? 'bg-[#121217] border border-slate-800' : 'bg-white'}`}
+            >
+              <div className={`flex items-center justify-between p-5 border-b ${darkMode ? 'border-slate-800' : 'border-slate-100'}`}>
+                <h3 className={`font-bold flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                  <Headphones size={20} className="text-amber-500" />
+                  {t.sunoModalTitle}
+                </h3>
+                <button onClick={() => setShowSunoModal(false)} className={`p-2 rounded-xl transition-colors ${darkMode ? 'hover:bg-slate-800 text-slate-400 hover:text-white' : 'hover:bg-slate-100 text-slate-500 hover:text-slate-900'}`}>
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="p-6 space-y-6">
+                <div>
+                  <label className={`block text-sm font-bold mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                    {t.sunoGenreAction}
+                  </label>
+                  <select 
+                    value={sunoGenre}
+                    onChange={(e) => setSunoGenre(e.target.value)}
+                    className={`w-full p-4 rounded-xl border ${darkMode ? 'bg-[#09090b] border-slate-700 text-white focus:ring-amber-500/50' : 'bg-slate-50 border-slate-200 focus:ring-amber-400'} focus:ring-2 focus:outline-none transition-all`}
+                  >
+                    <option value="" disabled>{t.sunoGenreAction}</option>
+                    {Object.entries(t.genres).map(([id, label]) => (
+                      <option key={id} value={id}>{label}</option>
+                    ))}
+                    <option value="pop">بوب (Pop)</option>
+                    <option value="rock">روك (Rock)</option>
+                    <option value="lofi">لوفي (Lo-Fi)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className={`block text-sm font-bold mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                    {t.sunoMoodPlaceholder}
+                  </label>
+                  <textarea 
+                    value={sunoMood}
+                    onChange={(e) => setSunoMood(e.target.value)}
+                    placeholder={t.sunoMoodPlaceholder}
+                    rows={4}
+                    className={`w-full p-4 rounded-xl border resize-none ${darkMode ? 'bg-[#09090b] border-slate-700 text-white focus:ring-amber-500/50' : 'bg-slate-50 border-slate-200 focus:ring-amber-400'} focus:ring-2 focus:outline-none transition-all`}
+                  />
+                </div>
+                <button 
+                  onClick={handleGenerateMusicPrompt}
+                  disabled={!sunoMood.trim() || !sunoGenre.trim()}
+                  className="w-full py-4 bg-amber-600 hover:bg-amber-500 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                >
+                  <Sparkles size={20} /> {t.sunoPromptBtn}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       <style dangerouslySetInnerHTML={{ __html: `
         @import url('https://fonts.googleapis.com/css2?family=Aref+Ruqaa:wght@400;700&family=Pacifico&family=Noto+Sans+Arabic:wght@400;700;900&display=swap');
