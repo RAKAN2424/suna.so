@@ -13,6 +13,16 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 
 import { translations } from './translations';
 
+const PHONETIC_RULES = `**قواعد التشكيل الصوتي الاحترافية (Phonetic Transcription Framework) الإلزامية المطلقة:**
+إنت بتكتب "نوتة موسيقية/Midi File" بالحروف عشان تجبر الذكاء الاصطناعي (زي Suno و Udio) ينطق مصري لغة شارع مليون في المية، اتبع الميكانيزم ده حرفياً وبدون فذلكة نحوية:
+1. إعدام القاف تماماً (Phonetic Mapping): تحويل القاف إلى (ئـ) أو (ء) (مثال: ئَلْبِيْ، طَريْئْ، بَئْوَاْ) ولا تكتب قاف أبداً لمنع تفخيم الكلمة.
+2. هندسة السكون (Beat Stops & Time Stretching): حط سكون (ْ) على حروف المد (لِيَّاْ، يُـْومْ، دِلْـوَْئّتِْيْ) وفي أواخر الكلمات للتقفيل الحاد لتقطيع الصوت ومنع التمدد (Staccato).
+3. هندسة الشدة (Punch/Groove): استخدم الشدة (ّ) بكثافة (وحتى مع السكون: مَّْثِلْتْ) لخلق Bounce و Vocal weight عشان الكلمة "تخبط" مع الـ Kick.
+4. التشكيل العكسي المكسور (Micro-tuning): إكسر حروف العطف والمضارعة زي نطق الشارع المخطوف السريع (وِقولتْ، بِتْغِيبْ) بدل الفتحة.
+5. التاء المربوطة والمفتوحة: اقفل التاء المربوطة أو الهاء بفتحة وهاء وسكون (بَطَّايَهْ، حِكَايَهْ) عشان تجبر الصوت يفتح كأنه A صريح.
+6. التقطيع البصري: استخدم التطويل (ـ) لخلق مساحات وتحديد طول المقاطع الصوتية (Syllables).
+القاعدة الذهبية: مفيش إعراب ولا فصحى.. التشكيل بيتحط على حركة الشفايف واللسان وقت التسجيل (WYSIWYG)، استبدل الحروف المقعرة (ث، ذ، ظ) بحروف الشارع (س، ز، ض/ز).`;
+
 const appId = typeof (window as any).__app_id !== 'undefined' ? (window as any).__app_id : 'egyptian-studio-pro';
 
 const App = () => {
@@ -213,7 +223,10 @@ const App = () => {
     1. الأسلوب المطلوب: ${genreInstructions[genre]}
     2. اللغة: عامية مصرية 'بيور' (Pure Egyptian Slang). تجنب أي كلمات فصحى تماماً. استخدم لغة الشارع الحقيقية، المصطلحات الدارجة، وروح 'السرسجة' الشيك أو الشجن الشعبي حسب النوع.
     3. الإبداع: استخدم استعارات من الشارع المصري، أمثال شعبية مطورة، لغة 'الشباب' الحالية، ومصطلحات 'التريند'.
-    4. التشكيل: ضع تشكيلاً إيقاعياً (Phonetic Diacritics) يضمن نطق الكلمات بلهجة مصرية 100% (مثلاً: الجيم دائماً G، القاف غالباً همزة، التسكين في مكانه الصحيح).
+    4. التشكيل: ضع تشكيلاً إيقاعياً يضمن نطق الكلمات بلهجة مصرية 100%.
+
+${PHONETIC_RULES}
+
     5. الهيكل: المستخدم سيعطيك فكرة أو كلمات بسيطة، حولها لعمل فني متكامل ومبهر مقسم إلى مقاطع واضحة.
     6. **قانون صارم (لا تخالفه أبداً):** التزم بهذا الترتيب والتقسيم في المخرج النهائي:
 
@@ -263,12 +276,10 @@ ${metaTags}
 
     const sysPrompt = `أنت 'حَافِظ'، الخبير الأول في فونوتيكا (علم أصوات) الشارع المصري. 
     مهمتك: وضع التشكيل (الحركات) الكامل على النص ليعكس النطق العامي المصري 'الحقيقي' بدقة مذهلة. 
-    ركز على: 
-    1. نطق الجيم القاهرية (G) والقاف (همزة غالباً). 
-    2. التسكين والشدة في لغة الشارع والمهرجانات. 
-    3. إدغام الحروف (مثلاً: 'مش عارف' تنطق 'مشعارف').
-    4. نبرة الصوت (Intonation) الخاصة بالمصريين في الكلام السريع.
-    لا تغير الكلمات، فقط شكلها لتنطق مصرية 100%. أخرج النص المشكل فقط.`;
+    
+${PHONETIC_RULES}
+    
+    لا تغير الكلمات، فقط شكلها لتنطق مصرية 100%. أخرج النص المشكل فقط بدون أي شروحات.`;
 
     try {
       const result = await callAI(language === 'ar' ? `شكّل هذا النص بالعامية المصرية بدقة صوتية: "${inputText}"` : `Add diacritics to this text in Egyptian slang: "${inputText}"`, sysPrompt);
@@ -288,9 +299,11 @@ ${metaTags}
 
     const sysPrompt = `أنت المصحح اللغوي 'البروفيشنال' للعامية المصرية ولغة الشارع.
     قم بتصحيح الأخطاء الإملائية مع الحفاظ الكامل على 'الروشنة' وروح العامية (لا تحولها للفصحى أبداً). 
-    ضع تشكيلاً كاملاً ودقيقاً يوجه القارئ لنطق النص بلهجة مصرية أصلية (Phonetic Diacritics).
     إذا كانت الكلمة مكتوبة بطريقة 'سرسجة' مقبولة في الأغاني، حافظ عليها وصححها فنياً فقط.
-    أخرج النص المصحح والمشكل فقط.`;
+    
+${PHONETIC_RULES}
+
+    أخرج النص المصحح والمشكل فقط بدون أي شروحات.`;
 
     try {
       const result = await callAI(language === 'ar' ? `صحح هذا النص إملائياً وشكله للعامية: "${inputText}"` : `Correct spelling and add diacritics to this text: "${inputText}"`, sysPrompt);
@@ -479,7 +492,9 @@ ${metaTags}
       if (mode === 'egyptian') {
         sysPrompt = `أنت 'حَافِظ'، الخبير الأول والبروفيسور في تحليل وتفريغ اللهجة المصرية العامية الحية (خصوصاً لغة الشارع، المهرجانات، والراب).
         مهمتك: استمع بدقة شديدة للملف الصوتي، وفرغ الكلام بالعامية المصرية كما ينطق تماماً (حتى لو كانت كلمات 'سرسجة' أو مصطلحات تقنية موسيقية أو 'إيفيهات' دارجة).
-        ضع تشكيلاً كاملاً ودقيقاً يوضح النطق المصري الصحيح (الجيم G، القاف همزة، إلخ).
+        
+${PHONETIC_RULES}
+
         إذا كان هناك 'أديبس' (Ad-libs) أو أصوات خلفية مميزة، اذكرها بين قوسين.
         أخرج النص المفرغ والمشكل فقط باحترافية تامة.`;
         promptText = "قم بتفريغ هذا الصوت واكتبه بالعامية المصرية الأصلية مع التشكيل الدقيق جداً.";
@@ -866,24 +881,46 @@ ${metaTags}
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {wordSuggestions.synonyms && wordSuggestions.synonyms.length > 0 && (
-                    <div className={`p-4 ${darkMode ? 'bg-[#09090b] border-slate-800' : 'bg-slate-50 border-slate-200'} rounded-xl border`}>
-                      <h4 className={`text-sm font-bold ${darkMode ? 'text-emerald-400' : 'text-emerald-600'} mb-2`}>{t.synonyms}</h4>
-                      <div className="flex flex-wrap gap-2">
+                    <details className={`group ${darkMode ? 'bg-[#09090b] border-slate-800' : 'bg-slate-50 border-slate-200'} rounded-xl border [&_summary::-webkit-details-marker]:hidden`}>
+                      <summary className="flex cursor-pointer items-center justify-between p-4 font-bold">
+                        <h4 className={`text-sm ${darkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>{t.synonyms}</h4>
+                        <span className={`transition group-open:-rotate-180 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                          <svg fill="none" height="24" shapeRendering="geometricPrecision" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" viewBox="0 0 24 24" width="24"><path d="M6 9l6 6 6-6"></path></svg>
+                        </span>
+                      </summary>
+                      <div className="flex flex-wrap gap-2 px-4 pb-4">
                         {wordSuggestions.synonyms.map((s: string, i: number) => (
-                          <span key={i} className={`px-2 py-1 ${darkMode ? 'bg-emerald-900/20 text-emerald-300' : 'bg-emerald-100 text-emerald-700'} rounded text-xs`}>{s}</span>
+                          <button 
+                            key={i} 
+                            onClick={() => { setSearchWord(s); setTimeout(handleWordSearch, 100); }}
+                            className={`px-3 py-1.5 ${darkMode ? 'bg-emerald-900/20 text-emerald-300 hover:bg-emerald-800/40' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'} rounded-lg text-xs font-bold transition-all hover:scale-105 active:scale-95`}
+                          >
+                            {s}
+                          </button>
                         ))}
                       </div>
-                    </div>
+                    </details>
                   )}
                   {wordSuggestions.antonyms && wordSuggestions.antonyms.length > 0 && (
-                    <div className={`p-4 ${darkMode ? 'bg-[#09090b] border-slate-800' : 'bg-slate-50 border-slate-200'} rounded-xl border`}>
-                      <h4 className={`text-sm font-bold ${darkMode ? 'text-red-400' : 'text-red-600'} mb-2`}>{t.antonyms}</h4>
-                      <div className="flex flex-wrap gap-2">
+                    <details className={`group ${darkMode ? 'bg-[#09090b] border-slate-800' : 'bg-slate-50 border-slate-200'} rounded-xl border [&_summary::-webkit-details-marker]:hidden`}>
+                      <summary className="flex cursor-pointer items-center justify-between p-4 font-bold">
+                        <h4 className={`text-sm ${darkMode ? 'text-red-400' : 'text-red-600'}`}>{t.antonyms}</h4>
+                        <span className={`transition group-open:-rotate-180 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                          <svg fill="none" height="24" shapeRendering="geometricPrecision" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" viewBox="0 0 24 24" width="24"><path d="M6 9l6 6 6-6"></path></svg>
+                        </span>
+                      </summary>
+                      <div className="flex flex-wrap gap-2 px-4 pb-4">
                         {wordSuggestions.antonyms.map((a: string, i: number) => (
-                          <span key={i} className={`px-2 py-1 ${darkMode ? 'bg-red-900/20 text-red-300' : 'bg-red-100 text-red-700'} rounded text-xs`}>{a}</span>
+                          <button 
+                            key={i} 
+                            onClick={() => { setSearchWord(a); setTimeout(handleWordSearch, 100); }}
+                            className={`px-3 py-1.5 ${darkMode ? 'bg-red-900/20 text-red-300 hover:bg-red-800/40' : 'bg-red-100 text-red-700 hover:bg-red-200'} rounded-lg text-xs font-bold transition-all hover:scale-105 active:scale-95`}
+                          >
+                            {a}
+                          </button>
                         ))}
                       </div>
-                    </div>
+                    </details>
                   )}
                 </div>
               </motion.div>
@@ -1191,6 +1228,53 @@ ${metaTags}
                 </p>
               </div>
             )}
+          </div>
+        )}
+
+        {/* History Section */}
+        {history.length > 0 && (
+          <div className="mt-8 border-t pt-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className={`text-lg font-bold ${darkMode ? 'text-slate-300' : 'text-slate-700'} flex items-center gap-2`}>
+                <HistoryIcon size={20} /> {language === 'ar' ? 'السجل الأخير' : 'Recent History'}
+              </h3>
+              <button 
+                onClick={() => setHistory([])}
+                className="text-xs text-red-400 hover:text-red-500 font-bold"
+              >
+                {language === 'ar' ? 'مسح السجل' : 'Clear History'}
+              </button>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {history.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    setInputText(item.input);
+                    setOutputResult(item.output);
+                    setOutputType(item.type);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className={`text-right p-3 rounded-xl border transition-all ${
+                    darkMode ? 'bg-[#1a1a24] border-slate-800 hover:border-indigo-500/50' : 'bg-white border-slate-200 hover:border-indigo-400'
+                  } group`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                      darkMode ? 'bg-indigo-900/40 text-indigo-300' : 'bg-indigo-50 text-indigo-600'
+                    }`}>
+                      {item.type}
+                    </span>
+                    <span className="text-[10px] text-slate-500">
+                      {new Date(item.timestamp).toLocaleTimeString(language === 'ar' ? 'ar-EG' : 'en-US')}
+                    </span>
+                  </div>
+                  <p className={`text-xs font-bold truncate ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                    {item.input}
+                  </p>
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
