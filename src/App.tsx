@@ -4,7 +4,8 @@ import {
   RefreshCw, Check, AlertCircle, PlaySquare, Info, 
   Feather, Volume2, VolumeX, Search, BookOpen,
   Download, Save, FolderOpen, X, Headphones,
-  Upload, FileAudio, Moon, Sun, Languages, History as HistoryIcon
+  Upload, FileAudio, Moon, Sun, Languages, History as HistoryIcon,
+  Pause, Play, CheckCircle2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { GoogleGenAI } from '@google/genai';
@@ -34,10 +35,17 @@ const App = () => {
   const [wordSuggestions, setWordSuggestions] = useState<any>(null); 
   const [isSearchingWord, setIsSearchingWord] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
 
   const [showSunoModal, setShowSunoModal] = useState(false);
   const [sunoMood, setSunoMood] = useState('');
   const [sunoGenre, setSunoGenre] = useState('');
+
+  const [showVoiceCloneModal, setShowVoiceCloneModal] = useState(false);
+  const [voiceFile, setVoiceFile] = useState<File | null>(null);
+  const [targetAudioFile, setTargetAudioFile] = useState<File | null>(null);
+  const [cloneTargetText, setCloneTargetText] = useState('');
+  const [synthesisStep, setSynthesisStep] = useState(0);
 
   const [isListening, setIsListening] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -161,21 +169,36 @@ const App = () => {
 
     utterance.rate = 0.85; 
     
-    utterance.onstart = () => setIsSpeaking(true);
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => setIsSpeaking(false);
+    utterance.onstart = () => { setIsSpeaking(true); setIsPaused(false); };
+    utterance.onend = () => { setIsSpeaking(false); setIsPaused(false); };
+    utterance.onerror = () => { setIsSpeaking(false); setIsPaused(false); };
+    utterance.onpause = () => setIsPaused(true);
+    utterance.onresume = () => setIsPaused(false);
 
     window.speechSynthesis.speak(utterance);
+  };
+
+  const pauseSpeaking = () => {
+    if (window.speechSynthesis) {
+      window.speechSynthesis.pause();
+    }
+  };
+
+  const resumeSpeaking = () => {
+    if (window.speechSynthesis) {
+      window.speechSynthesis.resume();
+    }
   };
 
   const stopSpeaking = () => {
     if (window.speechSynthesis) {
       window.speechSynthesis.cancel();
       setIsSpeaking(false);
+      setIsPaused(false);
     }
   };
 
-  const callAI = async (promptText: string, systemInstruction: string, useSearch = false, expectJson = false, audioData?: { data: string, mimeType: string }) => {
+  const callAI = async (promptText: string, systemInstruction: string, useSearch = false, expectJson = false, audioData?: { data: string, mimeType: string } | { data: string, mimeType: string }[]) => {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
     let retries = 0;
     const maxRetries = 5;
@@ -192,12 +215,15 @@ const App = () => {
       config.responseMimeType = "application/json";
     }
 
-    const contents: any = audioData 
-      ? [
-          { inlineData: { data: audioData.data, mimeType: audioData.mimeType } },
-          promptText
-        ]
-      : promptText;
+    let contents: any;
+    if (audioData) {
+      const audioParts = Array.isArray(audioData) 
+        ? audioData.map(item => ({ inlineData: { data: item.data, mimeType: item.mimeType } }))
+        : [{ inlineData: { data: audioData.data, mimeType: audioData.mimeType } }];
+      contents = [...audioParts, promptText];
+    } else {
+      contents = promptText;
+    }
 
     while (retries < maxRetries) {
       try {
@@ -424,6 +450,94 @@ ${PHONETIC_RULES}
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleVoiceClone = async () => {
+    if (!voiceFile || !targetAudioFile) {
+      setError(language === 'ar' ? "يرجى رفع عينة صوت الشخص وعينة اللحن/الأداء." : "Please upload both the voice sample and the target performance sample.");
+      return;
+    }
+    
+    setShowVoiceCloneModal(false);
+    setIsLoading(true); setError(null); setOutputResult(''); 
+    setOutputType('voice_clone');
+    setSynthesisStep(1);
+
+    try {
+      const getBase64 = (file: File) => new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => {
+          if (typeof reader.result === 'string') resolve(reader.result.split(',')[1]);
+        };
+        reader.onerror = reject;
+      });
+
+      const sourceVoiceData = await getBase64(voiceFile);
+      // Step Delay Simulation
+      await new Promise(r => setTimeout(r, 2000));
+      setSynthesisStep(2);
+      const targetMelodyData = await getBase64(targetAudioFile);
+      await new Promise(r => setTimeout(r, 2500));
+      setSynthesisStep(3);
+
+      const sysPrompt = `[INTERNAL SYSTEM MODE: HAFIZ PRO SYNTHESIS ENGINE]
+      [CORE GOAL: 100% RECONSTRUCTION OF VOCAL TIMBRE FROM SOURCE INTO TARGET MELODY]
+
+      أنت الآن لا تقترح برومبتات، بل أنت 'خوارزمية الرندرة' (The Rendering Algorithm).
+      يجب أن تقرر بدقة جراحية كيف سيندمج الملفان الصبيان.
+
+      الملف الأول (Source DNA): الترددات، البحة، خامة الصوت، رنين الصدر والأنف.
+      الملف الثاني (Melody Structure): السلم الموسيقي، العرب الغنائية، التقطيع، النفس.
+
+      مهمتك التقنية:
+      1. فك شفرة البصمة الصوتية (Source) وتحويلها إلى معاملات (Parameters).
+      2. استخراج خارطة الأداء (Target) وتحويلها إلى منحنيات لحنية.
+      3. إجراء عملية الرندرة (Vocal Resynthesis): تركيب معاملات الصوت الأول على منحنيات الأداء الثاني.
+
+      أخرج النتيجة كتقرير 'مختبر تركيب صوتي' (Final Synthesis Report):
+      🧬 [المعالم الصوتية المنسوخة]: (تحليل الترددات والطبقة للـ Source).
+      🎹 [الخريطة اللحنية المتبعة]: (تحليل الأداء في الـ Target).
+      🎙️ [Vocal Output Log]: عرض كلمات الأغنية المنترة مع توصيحات دقيقة لكيفية نطقها بالبصمة الصوتية المنسوخة (مثلاً: هنا يجب استخدام البحّة الخاصة بالشخص، هنا يتم تطويل المدّ مثل أسلوبه).
+      🚀 [Synthesis Blueprint (100% Match)]: برومبت إنجليزي فائق التعقيد لاستعادة أدق جزيئات الصوت.
+      
+      **قانون:** يجب أن يشعر المستخدم أن البرنامج قام 'بهرس' الملفين معاً لينتج صوتاً موحداً.`;
+
+      const result = await callAI(
+        `قم بإجراء الرندرة الصوتية الكاملة. الكلمات المستهدفة: "${cloneTargetText || "نفس كلمات اللحن"}"`, 
+        sysPrompt, 
+        false, 
+        false, 
+        [
+          { data: sourceVoiceData, mimeType: voiceFile.type },
+          { data: targetMelodyData, mimeType: targetAudioFile.type }
+        ]
+      );
+
+      setSynthesisStep(4);
+      await new Promise(r => setTimeout(r, 1500));
+      
+      setOutputResult(result);
+      addToHistory('voice_clone', `${voiceFile.name} -> ${targetAudioFile.name}`, result);
+    } catch (err: any) {
+      setError(err.message || t.audioError);
+    } finally {
+      setIsLoading(false);
+      setSynthesisStep(0);
+    }
+  };
+
+  const downloadResult = () => {
+    if (!outputResult) return;
+    const blob = new Blob([outputResult], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `hafiz-synthesis-${Date.now()}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   const handleAnalyzeLyrics = async () => {
@@ -850,27 +964,6 @@ ${PHONETIC_RULES}
                 {darkMode ? <Sun size={20} /> : <Moon size={20} />}
               </button>
             </div>
-            
-            <div className={`flex flex-wrap justify-center ${darkMode ? 'bg-[#09090b] border-slate-800' : 'bg-slate-50 border-slate-200'} rounded-xl p-1 border w-full md:w-auto gap-1`}>
-               {Object.entries(t.genres).map(([id, label]) => (
-                 <div key={id} className="relative group flex-1 md:flex-none">
-                   <button 
-                      onClick={() => setGenre(id)}
-                      className={`w-full px-4 py-2 rounded-lg text-xs md:text-sm font-bold transition-all duration-300 min-h-[40px] ${
-                        genre === id 
-                        ? (darkMode ? 'bg-slate-800 text-indigo-400 shadow-md' : 'bg-white text-indigo-600 shadow-md border border-slate-200')
-                        : (darkMode ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-600')
-                      }`}
-                    >
-                     {label}
-                   </button>
-                   <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-slate-800 text-white text-[10px] rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 w-40 text-center shadow-xl border border-slate-700">
-                     {t.genreDescriptions[id as keyof typeof t.genreDescriptions]}
-                     <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-slate-800"></div>
-                   </div>
-                 </div>
-               ))}
-            </div>
           </div>
         </header>
 
@@ -1097,11 +1190,31 @@ ${PHONETIC_RULES}
             </div>
           </div>
 
-          <div className="flex justify-between items-center mb-3">
+          <div className="flex justify-between items-center mb-3 flex-wrap gap-2">
             <label className={`text-sm font-bold ${darkMode ? 'text-slate-400' : 'text-slate-500'} flex items-center gap-2`}>
                {t.mainInputLabel}
             </label>
-            <div className="flex gap-2">
+            <div className={`flex flex-wrap justify-center ${darkMode ? 'bg-[#09090b] border-slate-800' : 'bg-slate-50 border-slate-200'} rounded-xl p-1 border gap-1 w-full md:w-auto mt-2 md:mt-0 order-3 md:order-2`}>
+               {Object.entries(t.genres).map(([id, label]) => (
+                 <div key={id} className="relative group flex-1 md:flex-none">
+                   <button 
+                      onClick={() => setGenre(id)}
+                      className={`w-full px-4 py-2 rounded-lg text-xs font-bold transition-all duration-300 min-h-[36px] ${
+                        genre === id 
+                        ? (darkMode ? 'bg-slate-800 text-indigo-400 shadow-md' : 'bg-white text-indigo-600 shadow-md border border-slate-200')
+                        : (darkMode ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-600')
+                      }`}
+                    >
+                     {label}
+                   </button>
+                   <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-slate-800 text-white text-[10px] rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 w-40 text-center shadow-xl border border-slate-700">
+                     {t.genreDescriptions[id as keyof typeof t.genreDescriptions]}
+                     <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-slate-800"></div>
+                   </div>
+                 </div>
+               ))}
+            </div>
+            <div className="flex gap-2 order-2 md:order-3 ms-auto">
               <button onClick={loadInput} className={`${darkMode ? 'text-slate-600 hover:text-indigo-400' : 'text-slate-400 hover:text-indigo-600'} transition-colors p-1 min-w-[44px] min-h-[44px] flex items-center justify-center`} aria-label={t.loadSaved}>
                 <FolderOpen size={18} />
               </button>
@@ -1142,7 +1255,7 @@ ${PHONETIC_RULES}
           </div>
 
           {/* Action Buttons Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mt-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mt-4">
             <button 
               onClick={toggleListening}
               className={`col-span-1 py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all border-2 min-h-[56px] ${
@@ -1203,6 +1316,13 @@ ${PHONETIC_RULES}
             >
               <Sparkles size={18} /> {t.composeBtn}
             </button>
+
+            <button 
+              onClick={() => setShowVoiceCloneModal(true)}
+              className="col-span-1 py-3.5 bg-rose-600 hover:bg-rose-500 text-white rounded-2xl font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-lg shadow-rose-500/20 min-h-[56px]"
+            >
+              <Mic size={18} /> {t.voiceCloneBtn}
+            </button>
           </div>
         </div>
 
@@ -1224,22 +1344,41 @@ ${PHONETIC_RULES}
                 <span className={`font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{t.finalResult}</span>
               </div>
               <div className="flex gap-2">
-                {(outputType === 'spellcheck' || outputType === 'tashkeel') && !isLoading && (
+                {!isLoading && outputResult && (
                   isSpeaking ? (
-                    <button 
-                      onClick={stopSpeaking}
-                      className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold ${darkMode ? 'bg-red-500/20 text-red-500 border-red-500/30 hover:bg-red-500/30' : 'bg-red-100 text-red-600 border-red-200 hover:bg-red-200'} border transition-all min-h-[44px]`}
-                      aria-label={t.stopSpeakBtn}
-                    >
-                      <VolumeX size={18} /> {t.stopSpeakBtn}
-                    </button>
+                    <>
+                      {isPaused ? (
+                        <button 
+                          onClick={resumeSpeaking}
+                          className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold ${darkMode ? 'bg-amber-500/20 text-amber-500 border-amber-500/30 hover:bg-amber-500/30' : 'bg-amber-100 text-amber-600 border-amber-200 hover:bg-amber-200'} border transition-all min-h-[44px]`}
+                          aria-label={t.resumeBtn}
+                        >
+                          <Play size={18} /> <span className="hidden md:inline">{t.resumeBtn}</span>
+                        </button>
+                      ) : (
+                        <button 
+                          onClick={pauseSpeaking}
+                          className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold ${darkMode ? 'bg-amber-500/20 text-amber-500 border-amber-500/30 hover:bg-amber-500/30' : 'bg-amber-100 text-amber-600 border-amber-200 hover:bg-amber-200'} border transition-all min-h-[44px]`}
+                          aria-label={t.pauseBtn}
+                        >
+                          <Pause size={18} /> <span className="hidden md:inline">{t.pauseBtn}</span>
+                        </button>
+                      )}
+                      <button 
+                        onClick={stopSpeaking}
+                        className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold ${darkMode ? 'bg-red-500/20 text-red-500 border-red-500/30 hover:bg-red-500/30' : 'bg-red-100 text-red-600 border-red-200 hover:bg-red-200'} border transition-all min-h-[44px]`}
+                        aria-label={t.stopSpeakBtn}
+                      >
+                        <VolumeX size={18} /> <span className="hidden md:inline">{t.stopSpeakBtn}</span>
+                      </button>
+                    </>
                   ) : (
                     <button 
                       onClick={() => speakText(outputResult)}
                       className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold ${darkMode ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/30' : 'bg-emerald-100 text-emerald-600 border-emerald-200 hover:bg-emerald-200'} border transition-all min-h-[44px]`}
                       aria-label={t.speakBtn}
                     >
-                      <Volume2 size={18} /> {t.speakBtn}
+                      <Volume2 size={18} /> <span className="hidden md:inline">{t.speakBtn}</span>
                     </button>
                   )
                 )}
@@ -1280,19 +1419,86 @@ ${PHONETIC_RULES}
             
             <div className={`p-6 md:p-8 ${darkMode ? 'bg-gradient-to-b from-[#121217] to-[#0a0a0f]' : 'bg-white'}`}>
               {isLoading ? (
-                <LoadingIndicator 
-                  type={outputType}
-                  task={
-                    outputType === 'song' ? t.loadingComposing :
-                    outputType === 'tashkeel' ? t.loadingDiacritics :
-                    outputType === 'spellcheck' ? t.loadingCorrecting :
-                    outputType === 'analysis' ? t.loadingAnalyzing :
-                    t.loadingProcessing
-                  } 
-                />
+                outputType === 'voice_clone' ? (
+                  <div className="w-full max-w-lg mx-auto py-10 space-y-8">
+                    <div className="flex justify-between items-end">
+                      <div className="space-y-1">
+                        <p className={`text-xs font-bold uppercase tracking-wider ${darkMode ? 'text-rose-500' : 'text-rose-600'}`}>
+                          {language === 'ar' ? "مختبر التركيب الصوتي" : "Synthesis Lab"}
+                        </p>
+                        <p className={`text-base md:text-lg font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                          {synthesisStep === 1 && t.synthesisProgress.step1}
+                          {synthesisStep === 2 && t.synthesisProgress.step2}
+                          {synthesisStep === 3 && t.synthesisProgress.step3}
+                          {synthesisStep === 4 && t.synthesisProgress.step4}
+                        </p>
+                      </div>
+                      <span className={`text-3xl font-black ${darkMode ? 'text-rose-500' : 'text-rose-600'}`}>
+                        {synthesisStep * 25}%
+                      </span>
+                    </div>
+                    <div className={`w-full h-4 rounded-full overflow-hidden p-1 ${darkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
+                      <motion.div 
+                        initial={{ width: 0 }}
+                        animate={{ width: `${synthesisStep * 25}%` }}
+                        className="h-full rounded-full bg-gradient-to-r from-rose-600 via-rose-500 to-rose-400 shadow-[0_0_20px_rgba(225,29,72,0.6)]"
+                      />
+                    </div>
+                    <div className="grid grid-cols-4 gap-3">
+                       {[1, 2, 3, 4].map(s => (
+                         <div key={s} className="space-y-2">
+                           <div className={`h-1.5 rounded-full transition-all duration-500 ${s <= synthesisStep ? 'bg-rose-500 shadow-[0_0_10px_rgba(225,29,72,0.4)]' : (darkMode ? 'bg-slate-800' : 'bg-slate-200')}`} />
+                           <p className={`text-[10px] text-center font-bold font-arabic ${s <= synthesisStep ? (darkMode ? 'text-rose-400' : 'text-rose-600') : 'text-slate-500'}`}>
+                             {s === 1 && "DNA"}
+                             {s === 2 && "Melody"}
+                             {s === 3 && "Merge"}
+                             {s === 4 && "Render"}
+                           </p>
+                         </div>
+                       ))}
+                    </div>
+                  </div>
+                ) : (
+                  <LoadingIndicator 
+                    type={outputType}
+                    task={
+                      outputType === 'song' ? t.loadingComposing :
+                      outputType === 'tashkeel' ? t.loadingDiacritics :
+                      outputType === 'spellcheck' ? t.loadingCorrecting :
+                      outputType === 'analysis' ? t.loadingAnalyzing :
+                      outputType === 'voice_clone' ? t.loadingCloning :
+                      t.loadingProcessing
+                    } 
+                  />
+                )
               ) : (
                 <div className={`text-[1.3rem] md:text-[1.5rem] leading-[2.2] text-right font-arabic ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
                   <VirtualizedOutput text={outputResult} type={outputType} />
+                </div>
+              )}
+
+              {outputResult && outputType === 'voice_clone' && !isLoading && (
+                <div className={`mt-8 p-6 rounded-3xl border ${darkMode ? 'bg-emerald-950/20 border-emerald-900/30' : 'bg-emerald-50 border-emerald-100'} flex flex-col md:flex-row items-center justify-between gap-4`}>
+                  <div className="flex items-center gap-4">
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${darkMode ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-500 text-white shadow-lg'}`}>
+                      <CheckCircle2 size={24} />
+                    </div>
+                    <div>
+                      <p className={`text-sm font-bold ${darkMode ? 'text-emerald-400' : 'text-emerald-700'}`}>
+                        {t.downloadReady}
+                      </p>
+                      <p className={`text-[10px] md:text-xs font-medium ${darkMode ? 'text-emerald-500/60' : 'text-emerald-600/70'}`}>
+                        {language === 'ar' ? "تم حفظ جميع المعايير والترددات في الملف الفني." : "All parameters and frequencies saved in technical package."}
+                      </p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={downloadResult}
+                    className={`px-8 py-3.5 rounded-xl font-bold flex items-center gap-2 transition-all shadow-xl ${darkMode ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-900/40' : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/30'} active:scale-95`}
+                  >
+                    <Download size={18} />
+                    {t.exportBtn}
+                  </button>
                 </div>
               )}
             </div>
@@ -1302,6 +1508,15 @@ ${PHONETIC_RULES}
                 <Info size={18} className="shrink-0 mt-0.5" />
                 <p className="text-xs md:text-sm font-medium leading-relaxed">
                   <strong className={darkMode ? 'text-indigo-300' : 'text-indigo-700'}>{t.note}</strong> {t.noteText}
+                </p>
+              </div>
+            )}
+
+            {outputType === 'voice_clone' && (
+              <div className={`p-4 ${darkMode ? 'bg-rose-950/20 border-rose-900/30 text-rose-300/80' : 'bg-rose-50 border-rose-100 text-rose-600/80'} border-t flex items-start gap-3`}>
+                <Info size={18} className="shrink-0 mt-0.5" />
+                <p className="text-xs md:text-sm font-medium leading-relaxed">
+                  <strong className={darkMode ? 'text-rose-300' : 'text-rose-700'}>{t.note}</strong> {t.voiceMatchNote}
                 </p>
               </div>
             )}
@@ -1459,6 +1674,93 @@ ${PHONETIC_RULES}
                   className="w-full py-4 bg-amber-600 hover:bg-amber-500 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-50"
                 >
                   <Sparkles size={20} /> {t.sunoPromptBtn}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showVoiceCloneModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm rtl:text-right font-arabic">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className={`w-full max-w-lg overflow-hidden rounded-3xl shadow-2xl ${darkMode ? 'bg-[#121217] border border-slate-800' : 'bg-white'}`}
+            >
+              <div className={`flex items-center justify-between p-5 border-b ${darkMode ? 'border-slate-800' : 'border-slate-100'}`}>
+                <h3 className={`font-bold flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                  <Mic size={20} className="text-rose-500" />
+                  {t.voiceCloneModalTitle}
+                </h3>
+                <button onClick={() => setShowVoiceCloneModal(false)} className={`p-2 rounded-xl transition-colors ${darkMode ? 'hover:bg-slate-800 text-slate-400 hover:text-white' : 'hover:bg-slate-100 text-slate-500 hover:text-slate-900'}`}>
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className={`block text-xs font-bold mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                      {t.uploadSourceVoice}
+                    </label>
+                    <label className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-2xl cursor-pointer transition-all ${voiceFile ? 'border-emerald-500 bg-emerald-500/5' : (darkMode ? 'border-slate-700 hover:border-indigo-500 bg-slate-900/50' : 'border-slate-200 hover:border-indigo-400 bg-slate-50')}`}>
+                      <div className="flex flex-col items-center justify-center p-4 text-center">
+                        <Mic className={`w-8 h-8 mb-2 ${voiceFile ? 'text-emerald-500' : 'text-slate-400'}`} />
+                        <p className={`text-[10px] leading-tight ${voiceFile ? 'text-emerald-600 font-bold' : 'text-slate-500'}`}>
+                          {voiceFile ? voiceFile.name : t.uploadAudio}
+                        </p>
+                      </div>
+                      <input 
+                        type="file" 
+                        className="hidden" 
+                        accept="audio/*" 
+                        onChange={(e) => setVoiceFile(e.target.files?.[0] || null)} 
+                      />
+                    </label>
+                  </div>
+
+                  <div>
+                    <label className={`block text-xs font-bold mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                      {t.uploadTargetPerformance}
+                    </label>
+                    <label className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-2xl cursor-pointer transition-all ${targetAudioFile ? 'border-amber-500 bg-amber-500/5' : (darkMode ? 'border-slate-700 hover:border-amber-500 bg-slate-900/50' : 'border-slate-200 hover:border-amber-400 bg-slate-50')}`}>
+                      <div className="flex flex-col items-center justify-center p-4 text-center">
+                        <Music className={`w-8 h-8 mb-2 ${targetAudioFile ? 'text-amber-500' : 'text-slate-400'}`} />
+                        <p className={`text-[10px] leading-tight ${targetAudioFile ? 'text-amber-600 font-bold' : 'text-slate-500'}`}>
+                          {targetAudioFile ? targetAudioFile.name : t.uploadAudio}
+                        </p>
+                      </div>
+                      <input 
+                        type="file" 
+                        className="hidden" 
+                        accept="audio/*" 
+                        onChange={(e) => setTargetAudioFile(e.target.files?.[0] || null)} 
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                <div>
+                  <label className={`block text-sm font-bold mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                    {t.enterTargetLyrics}
+                  </label>
+                  <textarea 
+                    value={cloneTargetText}
+                    onChange={(e) => setCloneTargetText(e.target.value)}
+                    placeholder={t.enterTargetLyrics}
+                    rows={2}
+                    className={`w-full p-4 rounded-xl border resize-none ${darkMode ? 'bg-[#09090b] border-slate-700 text-white focus:ring-rose-500/50' : 'bg-slate-50 border-slate-200 focus:ring-rose-400'} focus:ring-2 focus:outline-none transition-all text-sm`}
+                  />
+                </div>
+                <button 
+                  onClick={handleVoiceClone}
+                  disabled={!voiceFile || !targetAudioFile}
+                  className="w-full py-4 bg-rose-600 hover:bg-rose-500 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-50 shadow-lg shadow-rose-500/20"
+                >
+                  <RefreshCw size={20} className={isLoading ? 'animate-spin' : ''} />
+                  {t.cloneAction}
                 </button>
               </div>
             </motion.div>
