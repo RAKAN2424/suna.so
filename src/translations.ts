@@ -79,7 +79,20 @@ export const translations = {
       trap_shaabi: "تراب شعبي",
       rap_egy: "راب مصري",
       pop_egy: "بوب شبابي",
-      romantic: "رومانسي/دراما"
+      romantic: "رومانسي/دراما",
+      afrobeat: "أفروبيت (Afrobeat)",
+      rnb: "آر أند بي (R&B)",
+      hiphop: "هيب هوب (Hip Hop)",
+      pop: "بوب عالمي (Global Pop)",
+      rock: "روك (Rock)",
+      jazz: "جاز (Jazz)",
+      blues: "بلوز (Blues)",
+      lofi: "لوفي (Lo-Fi)",
+      edm: "إليكترونيك دانس (EDM)",
+      reggaeton: "ريجاتون (Reggaeton)",
+      house: "هاوس (House)",
+      indie: "إندي (Indie)",
+      classical: "كلاسيك (Classical)"
     },
     genreDescriptions: {
       mahraganat: "إيقاع مقسوم سريع، طاقة عالية، كلمات شوارع أصلية.",
@@ -87,7 +100,20 @@ export const translations = {
       trap_shaabi: "مزيج بين التراب العالمي والروح الشعبية المصرية.",
       rap_egy: "تركيز على القافية والوزن، بانش لاينز قوية.",
       pop_egy: "كلمات خفيفة، روح فرفشة، حب مودرن.",
-      romantic: "مشاعر عميقة، شجن، استعارات عامية حزينة."
+      romantic: "مشاعر عميقة، شجن، استعارات عامية حزينة.",
+      afrobeat: "إيقاعات إفريقية دافئة، حيوية، تركز على الإيقاع الراقص.",
+      rnb: "ميلودي ناعم، مشاعر، أصوات R&B الحديثة.",
+      hiphop: "بيتات هيب هوب تقليدية، إيقاع واضح وصريح.",
+      pop: "موسيقى البوب العالمية الجذابة، ألحان سهلة الحفظ.",
+      rock: "جيتار قوي، طبول حية، طاقة عالية.",
+      jazz: "آلات النفخ، ارتجال، هارموني معقد.",
+      blues: "شعور بالشجن، جيتار وقيثارة، ألحان بطيئة.",
+      lofi: "إيقاعات هادئة، شريط كاسيت، للاسترخاء.",
+      edm: "باسي قوي، موسيقى المهرجانات الإلكترونية والرقص.",
+      reggaeton: "إيقاع لاتيني راقص ومميز.",
+      house: "إيقاعات 4/4، موسيقى النوادي.",
+      indie: "بديل وتجريبي، بعيد عن النمط التجاري.",
+      classical: "أوركسترالي، آلات وترية، توزيع سيمفوني."
     }
   },
   en: {
@@ -170,7 +196,20 @@ export const translations = {
       trap_shaabi: "Trap Shaabi",
       rap_egy: "Egyptian Rap",
       pop_egy: "Pop",
-      romantic: "Romantic"
+      romantic: "Romantic",
+      afrobeat: "Afrobeat",
+      rnb: "R&B",
+      hiphop: "Hip Hop",
+      pop: "Global Pop",
+      rock: "Rock",
+      jazz: "Jazz",
+      blues: "Blues",
+      lofi: "Lo-Fi",
+      edm: "EDM",
+      reggaeton: "Reggaeton",
+      house: "House",
+      indie: "Indie",
+      classical: "Classical"
     },
     genreDescriptions: {
       mahraganat: "Fast Maqsum rhythm, high energy, authentic street lyrics.",
@@ -178,7 +217,20 @@ export const translations = {
       trap_shaabi: "Mix of global Trap and Egyptian Shaabi spirit.",
       rap_egy: "Focus on rhyme and meter, strong punchlines.",
       pop_egy: "Light lyrics, festive spirit, modern love.",
-      romantic: "Deep emotions, melancholy, sad slang metaphors."
+      romantic: "Deep emotions, melancholy, sad slang metaphors.",
+      afrobeat: "Warm African rhythms, energetic, dance-focused.",
+      rnb: "Smooth melody, feelings, modern R&B sounds.",
+      hiphop: "Traditional hip hop beats, clear distinct rhythm.",
+      pop: "Catchy global pop music, easy to memorize melodies.",
+      rock: "Strong guitars, live drums, high energy.",
+      jazz: "Brass instruments, improvisation, complex harmony.",
+      blues: "Melancholy feel, guitar and bass, slow melodies.",
+      lofi: "Calm beats, cassette tape feel, for relaxation.",
+      edm: "Heavy bass, electronic festival and dance music.",
+      reggaeton: "Distinctive dancing Latin rhythm.",
+      house: "4/4 beats, club music.",
+      indie: "Alternative and experimental, distinct from commercial.",
+      classical: "Orchestral, string instruments, symphonic arrangement."
     }
   }
 };

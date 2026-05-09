@@ -44,6 +44,7 @@ const App = () => {
   const [showVoiceCloneModal, setShowVoiceCloneModal] = useState(false);
   const [voiceFile, setVoiceFile] = useState<File | null>(null);
   const [targetAudioFile, setTargetAudioFile] = useState<File | null>(null);
+  const [generatedAudioUrl, setGeneratedAudioUrl] = useState<string | null>(null);
   const [cloneTargetText, setCloneTargetText] = useState('');
   const [synthesisStep, setSynthesisStep] = useState(0);
 
@@ -242,69 +243,114 @@ const App = () => {
     throw new Error(language === 'ar' ? "فشل الاتصال بالخادم." : "Connection failed.");
   };
 
+  const callAIAudio = async (promptText: string, modelType: 'music' | 'tts' = 'music', voiceName = 'Kore') => {
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    
+    if (modelType === 'tts') {
+      const response = await ai.models.generateContent({
+        model: "gemini-3.1-flash-tts-preview",
+        contents: [{ parts: [{ text: promptText }] }],
+        config: {
+          responseModalities: ["AUDIO"],
+          speechConfig: {
+              voiceConfig: {
+                prebuiltVoiceConfig: { voiceName },
+              },
+          },
+        },
+      });
+      const data = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+      if (data) {
+        // Convert PCM 16-bit to WAV
+        const binaryString = atob(data);
+        const pcm16Bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          pcm16Bytes[i] = binaryString.charCodeAt(i);
+        }
+        
+        const sampleRate = 24000;
+        const buffer = new ArrayBuffer(44 + pcm16Bytes.length);
+        const view = new DataView(buffer);
+        
+        const writeString = (view: DataView, offset: number, str: string) => {
+          for (let i = 0; i < str.length; i++) {
+            view.setUint8(offset + i, str.charCodeAt(i));
+          }
+        };
+
+        writeString(view, 0, 'RIFF');
+        view.setUint32(4, 36 + pcm16Bytes.length, true);
+        writeString(view, 8, 'WAVE');
+        writeString(view, 12, 'fmt ');
+        view.setUint32(16, 16, true);
+        view.setUint16(20, 1, true); // PCM
+        view.setUint16(22, 1, true); // Mono
+        view.setUint32(24, sampleRate, true);
+        view.setUint32(28, sampleRate * 2, true);
+        view.setUint16(32, 2, true);
+        view.setUint16(34, 16, true);
+        writeString(view, 36, 'data');
+        view.setUint32(40, pcm16Bytes.length, true);
+
+        for (let i = 0; i < pcm16Bytes.length; i++) {
+          view.setUint8(44 + i, pcm16Bytes[i]);
+        }
+
+        const blob = new Blob([view], { type: 'audio/wav' });
+        return { audioUrl: URL.createObjectURL(blob), textResult: promptText };
+      }
+    } else {
+      const response = await ai.models.generateContentStream({
+        model: "lyria-3-clip-preview",
+        contents: promptText,
+      });
+
+      let audioBase64 = "";
+      let lyrics = "";
+      let mimeType = "audio/wav";
+
+      for await (const chunk of response) {
+        const parts = chunk.candidates?.[0]?.content?.parts;
+        if (!parts) continue;
+        for (const part of parts) {
+          if (part.inlineData?.data) {
+            if (!audioBase64 && part.inlineData.mimeType) {
+              mimeType = part.inlineData.mimeType;
+            }
+            audioBase64 += part.inlineData.data;
+          }
+          if (part.text && !lyrics) {
+            lyrics = part.text;
+          }
+        }
+      }
+
+      const binary = atob(audioBase64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      const blob = new Blob([bytes], { type: mimeType });
+      return { audioUrl: URL.createObjectURL(blob), textResult: lyrics };
+    }
+    
+    throw new Error(language === 'ar' ? "فشل إنشاء الصوت." : "Failed to generate audio.");
+  };
+
   const handleGenerateSong = async () => {
     if (!inputText.trim()) return;
     setIsLoading(true); setError(null); setOutputResult(''); setOutputType('song');
+    setGeneratedAudioUrl(null);
 
-    const metaTags = `
-[Style: Egyptian Urban, Street Flow, Non-Classical]
-[Vocal Delivery: Pure Egyptian Slang, Casual Rhythm]
-[Pronunciation: Ignore Fusha rules strictly. Read diacritics as beat markers for Egyptian street accent]
-    `.trim();
-
-    const genreInstructions: Record<string, string> = {
-      mahraganat: "مهرجانات شعبية مصرية. إيقاع 'مقسوم' سريع، طاقة عالية، كلمات شوارع أصلية، 'سرسجة' شيك، قوافي شعبية مبتكرة، استخدام مصطلحات 'المناطق الشعبية' والجدعنة.",
-      shaabi: "شعبي مصري أصيل (مودرن أو قديم). مواويل، حكم شعبية، كلمات فيها شجن أو فرح شعبي، استخدام آلات زي الأوكورديون والكمانجا في الروح.",
-      trap_shaabi: "تراب شعبي (Trap Shaabi). مزيج بين إيقاعات التراب العالمي والروح الشعبية المصرية. كلمات فيها 'إيجو' (Ego)، فخر، مصطلحات شباب الشارع المودرن، قافية قوية ومقطعة.",
-      rap_egy: "راب مصري (Old school or New school). تركيز عالي على القافية والوزن، 'بانش لاينز' (Punchlines) قوية، حكاوي من الواقع المصري.",
-      pop_egy: "بوب مصري شبابي. كلمات خفيفة، قوافي سهلة الحفظ، روح 'فرفشة' أو حب مودرن.",
-      romantic: "رومانسي/دراما مصري. كلمات عميقة، شجن، استخدام استعارات مكنية من العامية المصرية الحزينة أو الرومانسية."
-    };
-
-    const sysPrompt = `أنت 'حَافِظ'، كاتب الأغاني والشاعر والمنتج الفني الأول المتخصص في العامية المصرية بجميع ألوانها (شعبي، مهرجانات، تراب، راب).
-    1. الأسلوب المطلوب: ${genreInstructions[genre]}
-    2. اللغة: عامية مصرية 'بيور' (Pure Egyptian Slang). تجنب أي كلمات فصحى تماماً. استخدم لغة الشارع الحقيقية، المصطلحات الدارجة، وروح 'السرسجة' الشيك أو الشجن الشعبي حسب النوع.
-    3. الإبداع: استخدم استعارات من الشارع المصري، أمثال شعبية مطورة، لغة 'الشباب' الحالية، ومصطلحات 'التريند'.
-    4. التشكيل: ضع تشكيلاً إيقاعياً يضمن نطق الكلمات بلهجة مصرية 100%.
-
-${PHONETIC_RULES}
-
-    5. الهيكل: المستخدم سيعطيك فكرة أو كلمات بسيطة، حولها لعمل فني متكامل ومبهر مقسم إلى مقاطع واضحة.
-    6. **قانون صارم (لا تخالفه أبداً):** التزم بهذا الترتيب والتقسيم في المخرج النهائي:
-
-${metaTags}
-
-[Intro]
-(كلمات البداية أو الدخلة)
-
-[Verse 1]
-(المقطع الأول)
-
-[Chorus]
-(اللازمة - الكورس - اجعله قوي جداً ويعلق في الذهن)
-
-[Verse 2]
-(المقطع الثاني)
-
-[Chorus]
-(إعادة اللازمة)
-
-[Outro]
-(كلمات النهاية أو القفلة)
-
----
-[Music Analysis & Suggestions]
-(هنا اقترح بدقة أنواع الموسيقى المصرية التي تليق على هذه الكلمات تحديداً ووضح السبب)
-
-[Suno AI Prompt]
-(هنا اكتب برومبت إنجليزي احترافي جداً لموقع Suno AI يعكس روح الأغنية والآلات المقترحة)
-    
-    أخرج النص فقط بدون أي تعليقات خارجية أو مقدمات.`;
+    const genreText = Object.entries(t.genres).find(([id]) => id === genre)?.[1] || "Pop";
 
     try {
-      const result = await callAI(language === 'ar' ? `قم بترتيب وتأليف الأغنية باحترافية بناءً على: "${inputText}"` : `Compose a professional song based on: "${inputText}"`, sysPrompt);
-      setOutputResult(result);
-      addToHistory('song', inputText, result);
+      const prompt = `Generate a ${genreText} song based on these lyrics/topic: ${inputText}. Ensure it has high energy and a clear rhythm.`;
+      const res = await callAIAudio(prompt, 'music');
+      
+      setOutputResult(res.textResult || (language === 'ar' ? 'تم إنشاء المقطع الموسيقي بنجاح.' : 'Music generated successfully.'));
+      setGeneratedAudioUrl(res.audioUrl);
+      addToHistory('song', inputText.substring(0, 50) + "...", res.textResult || '🎵 Audio Track');
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -378,11 +424,11 @@ ${PHONETIC_RULES}
 
     try {
       const result = await callAI(language === 'ar' ? `هات كل احتمالات التشكيل للكلمة دي: "${searchWord}"` : `Get all diacritics for this word: "${searchWord}"`, sysPrompt, false, true);
-      const parsedData = JSON.parse(result);
+      const parsedData = JSON.parse(result.replace(/^```json\n|\n```$/g, ''));
       setWordSuggestions(parsedData);
       addToHistory('search', searchWord, result);
     } catch (err: any) {
-      setWordSuggestions([{ word: language === 'ar' ? "خطأ" : "Error", meaning: language === 'ar' ? "حدث خطأ أثناء جلب التشكيلات، حاول مجدداً." : "Error fetching diacritics, try again." }]);
+      setWordSuggestions({ suggestions: [{ word: language === 'ar' ? "خطأ" : "Error", meaning: language === 'ar' ? "حدث خطأ أثناء جلب التشكيلات، حاول مجدداً." : "Error fetching diacritics, try again." }] });
     } finally {
       setIsSearchingWord(false);
     }
@@ -462,6 +508,7 @@ ${PHONETIC_RULES}
     setIsLoading(true); setError(null); setOutputResult(''); 
     setOutputType('voice_clone');
     setSynthesisStep(1);
+    setGeneratedAudioUrl(null);
 
     try {
       const getBase64 = (file: File) => new Promise<string>((resolve, reject) => {
@@ -474,11 +521,8 @@ ${PHONETIC_RULES}
       });
 
       const sourceVoiceData = await getBase64(voiceFile);
-      // Step Delay Simulation
-      await new Promise(r => setTimeout(r, 2000));
       setSynthesisStep(2);
       const targetMelodyData = await getBase64(targetAudioFile);
-      await new Promise(r => setTimeout(r, 2500));
       setSynthesisStep(3);
 
       const sysPrompt = `[INTERNAL SYSTEM MODE: HAFIZ PRO SYNTHESIS ENGINE]
@@ -487,24 +531,22 @@ ${PHONETIC_RULES}
       أنت الآن لا تقترح برومبتات، بل أنت 'خوارزمية الرندرة' (The Rendering Algorithm).
       يجب أن تقرر بدقة جراحية كيف سيندمج الملفان الصبيان.
 
-      الملف الأول (Source DNA): الترددات، البحة، خامة الصوت، رنين الصدر والأنف.
-      الملف الثاني (Melody Structure): السلم الموسيقي، العرب الغنائية، التقطيع، النفس.
+      الملف الأول (Source DNA): الترددات، البحة، خامة الصوت.
+      الملف الثاني (Melody Structure): السلم الموسيقي، العرب الغنائية، النفس.
 
-      مهمتك التقنية:
-      1. فك شفرة البصمة الصوتية (Source) وتحويلها إلى معاملات (Parameters).
-      2. استخراج خارطة الأداء (Target) وتحويلها إلى منحنيات لحنية.
-      3. إجراء عملية الرندرة (Vocal Resynthesis): تركيب معاملات الصوت الأول على منحنيات الأداء الثاني.
-
-      أخرج النتيجة كتقرير 'مختبر تركيب صوتي' (Final Synthesis Report):
-      🧬 [المعالم الصوتية المنسوخة]: (تحليل الترددات والطبقة للـ Source).
-      🎹 [الخريطة اللحنية المتبعة]: (تحليل الأداء في الـ Target).
-      🎙️ [Vocal Output Log]: عرض كلمات الأغنية المنترة مع توصيحات دقيقة لكيفية نطقها بالبصمة الصوتية المنسوخة (مثلاً: هنا يجب استخدام البحّة الخاصة بالشخص، هنا يتم تطويل المدّ مثل أسلوبه).
-      🚀 [Synthesis Blueprint (100% Match)]: برومبت إنجليزي فائق التعقيد لاستعادة أدق جزيئات الصوت.
+      استخرج تقرير:
+      🧬 [المعالم الصوتية المنسوخة]: تحليل الصوت
+      🎹 [الخريطة اللحنية المتبعة]: تحليل اللحن
+      🎙️ [Vocal Output Log]: عرض الكلمات مع تطبيق الأداء
       
-      **قانون:** يجب أن يشعر المستخدم أن البرنامج قام 'بهرس' الملفين معاً لينتج صوتاً موحداً.`;
+      اكتب التقرير النهائي باللغتين العربية والإنجليزية.
+      `;
 
-      const result = await callAI(
-        `قم بإجراء الرندرة الصوتية الكاملة. الكلمات المستهدفة: "${cloneTargetText || "نفس كلمات اللحن"}"`, 
+      const targetTextToSpeak = cloneTargetText || "Test voice cloning successful!";
+
+      // Generate the text report
+      const resText = await callAI(
+        `قم بإجراء الرندرة الصوتية الكاملة. الكلمات المستهدفة: "${targetTextToSpeak}"`, 
         sysPrompt, 
         false, 
         false, 
@@ -513,12 +555,15 @@ ${PHONETIC_RULES}
           { data: targetMelodyData, mimeType: targetAudioFile.type }
         ]
       );
-
-      setSynthesisStep(4);
-      await new Promise(r => setTimeout(r, 1500));
       
-      setOutputResult(result);
-      addToHistory('voice_clone', `${voiceFile.name} -> ${targetAudioFile.name}`, result);
+      setSynthesisStep(4);
+      
+      // Generate the placeholder audio
+      const res = await callAIAudio(targetTextToSpeak, 'tts');
+      
+      setOutputResult(resText);
+      setGeneratedAudioUrl(res.audioUrl);
+      addToHistory('voice_clone', `${voiceFile.name} -> ${targetAudioFile.name}`, resText);
     } catch (err: any) {
       setError(err.message || t.audioError);
     } finally {
@@ -528,6 +573,16 @@ ${PHONETIC_RULES}
   };
 
   const downloadResult = () => {
+    if (generatedAudioUrl) {
+      const a = document.createElement('a');
+      a.href = generatedAudioUrl;
+      a.download = `hafiz-audio-${Date.now()}.wav`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      return;
+    }
+
     if (!outputResult) return;
     const blob = new Blob([outputResult], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
@@ -601,7 +656,7 @@ ${PHONETIC_RULES}
 
     try {
       const result = await callAI(language === 'ar' ? `هات كلمات لها نفس قافية: "${rhymeWord}"` : `Get words that rhyme with: "${rhymeWord}"`, sysPrompt, false, true);
-      const parsedData = JSON.parse(result);
+      const parsedData = JSON.parse(result.replace(/^```json\n|\n```$/g, ''));
       setOutputResult(language === 'ar' ? `القوافي المقترحة لـ "${rhymeWord}":\n${parsedData.rhymes.join('\n')}` : `Suggested rhymes for "${rhymeWord}":\n${parsedData.rhymes.join('\n')}`);
       setOutputType('rhymes');
     } catch (err: any) {
@@ -612,15 +667,19 @@ ${PHONETIC_RULES}
   };
 
   const handleRewriteLine = async () => {
-    if (!lineToRewrite.trim() || !inputText.trim()) return;
+    if (!lineToRewrite.trim()) return;
     setIsLoading(true); setError(null);
     
-    const sysPrompt = `أنت خبير في كتابة الأغاني بالعامية المصرية.
-    مهمتك: إعادة صياغة السطر الذي سيعطيك إياه المستخدم، مع الحفاظ التام على القافية (Rhyme) والوزن (Meter) الخاص بالسطر الأصلي، وبنفس أسلوب الأغنية.
-    أخرج السطر الجديد فقط.`;
+    const sysPrompt = `أنت خبير في إعادة صياغة النصوص والعبارات.
+    مهمتك: إعادة صياغة السطر الذي سيعطيك إياه المستخدم. حافظ على الوزن (Meter) والمعنى، واجعله يبدو أكثر جاذبية واحترافية.
+    أخرج السطر الجديد فقط دون أي مقدمات.`;
 
     try {
-      const result = await callAI(language === 'ar' ? `أعد صياغة هذا السطر: "${lineToRewrite}"\n\nمع الحفاظ على القافية والوزن في سياق هذه الأغنية: "${inputText}"` : `Rewrite this line: "${lineToRewrite}"\n\nMaintaining rhyme and meter in the context of this song: "${inputText}"`, sysPrompt);
+      const prompt = inputText.trim() 
+        ? (language === 'ar' ? `أعد صياغة هذا السطر: "${lineToRewrite}"\n\nمع الحفاظ على السياق المتعلق بـ: "${inputText}"` : `Rewrite this line: "${lineToRewrite}"\n\nMaintaining context of: "${inputText}"`)
+        : (language === 'ar' ? `أعد صياغة هذا السطر بطريقة إبداعية: "${lineToRewrite}"` : `Rewrite this line creatively: "${lineToRewrite}"`);
+        
+      const result = await callAI(prompt, sysPrompt);
       setOutputResult(language === 'ar' ? `السطر الجديد:\n${result}` : `New line:\n${result}`);
       setOutputType('rewrite');
     } catch (err: any) {
@@ -931,12 +990,10 @@ ${PHONETIC_RULES}
               </div>
               <div className="flex items-center gap-3">
                 <div className="flex items-end gap-2">
-                  <h1 className={`text-4xl md:text-6xl font-ruqaa ${darkMode ? 'neon-ar' : 'text-indigo-600'} leading-none pb-2`}>
-                    {t.title}
+                  <h1 className={`text-4xl md:text-6xl font-ruqaa ${darkMode ? 'neon-ar' : 'text-indigo-600'} leading-none pb-2 flex items-baseline gap-3`}>
+                    <span>{t.title}</span>
+                    <span>{t.subtitle}</span>
                   </h1>
-                  <span className={`text-sm md:text-lg font-arabic ${darkMode ? 'text-sky-300/80' : 'text-sky-600'} mb-3 font-light italic`}>
-                    {t.subtitle}
-                  </span>
                 </div>
                 <div className="h-0.5 w-16 bg-gradient-to-l from-sky-500 to-transparent rounded-full hidden md:block shadow-[0_0_8px_rgba(56,189,248,0.8)] mb-2"></div>
               </div>
@@ -1473,6 +1530,14 @@ ${PHONETIC_RULES}
                 )
               ) : (
                 <div className={`text-[1.3rem] md:text-[1.5rem] leading-[2.2] text-right font-arabic ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
+                  {generatedAudioUrl && (
+                    <div className={`mb-6 p-4 rounded-2xl border ${darkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+                       <h3 className={`font-bold mb-3 ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                         {language === 'ar' ? 'التمثيل الصوتي' : 'Generated Audio'}
+                       </h3>
+                       <audio src={generatedAudioUrl} controls className="w-full rounded-lg" />
+                    </div>
+                  )}
                   <VirtualizedOutput text={outputResult} type={outputType} />
                 </div>
               )}
@@ -1651,9 +1716,6 @@ ${PHONETIC_RULES}
                     {Object.entries(t.genres).map(([id, label]) => (
                       <option key={id} value={id}>{label}</option>
                     ))}
-                    <option value="pop">بوب (Pop)</option>
-                    <option value="rock">روك (Rock)</option>
-                    <option value="lofi">لوفي (Lo-Fi)</option>
                   </select>
                 </div>
                 <div>
