@@ -5,7 +5,7 @@ import {
   Feather, Volume2, VolumeX, Search, BookOpen,
   Download, Save, FolderOpen, X, Headphones,
   Upload, FileAudio, Moon, Sun, Languages, History as HistoryIcon,
-  Pause, Play, CheckCircle2
+  Pause, Play, CheckCircle2, Youtube
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { GoogleGenAI } from '@google/genai';
@@ -47,6 +47,8 @@ const App = () => {
   const [generatedAudioUrl, setGeneratedAudioUrl] = useState<string | null>(null);
   const [cloneTargetText, setCloneTargetText] = useState('');
   const [synthesisStep, setSynthesisStep] = useState(0);
+
+  const [youtubeLink, setYoutubeLink] = useState('');
 
   const [isListening, setIsListening] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -751,6 +753,62 @@ ${PHONETIC_RULES}
     }
   };
 
+  const handleDeepMusicAnalysis = async () => {
+    if (!audioFile && !youtubeLink.trim()) return;
+    setIsLoading(true); setError(null); setOutputResult(''); 
+    setOutputType('analysis');
+
+    try {
+      let audioPart: any = undefined;
+      let targetName = "";
+      
+      if (audioFile) {
+        const base64Data = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.readAsDataURL(audioFile);
+          reader.onload = () => {
+            if (typeof reader.result === 'string') {
+              resolve(reader.result.split(',')[1]);
+            }
+          };
+          reader.onerror = reject;
+        });
+        audioPart = { data: base64Data, mimeType: audioFile.type };
+        targetName = audioFile.name;
+      }
+
+      if (youtubeLink.trim() && !audioFile) {
+        targetName = youtubeLink;
+      } else if (youtubeLink.trim() && audioFile) {
+        targetName = audioFile.name + " + URL";
+      }
+
+      const sysPrompt = `أنت مهندس صوت ومنتج موسيقي وموزع عالمي وباحث موسيقي محترف جداً بخصائص الذكاء الاصطناعي الفائق.
+مهمتك: ${audioFile ? "قم بتحليل هذا المقطع الصوتي المرفق بأقصى دقة ممكنة." : "قم باستخدام أداة البحث (Google Search) للبحث عن هذه الأغنية أو الموسيقى عبر رابط اليوتيوب المرفق، وحللها بكل دقة واحترافية."}
+المطلوب منك تحليل وتفكيك موسيقي شامل جداً:
+1. تصنيف النوع الموسيقي بدقة عالية (Exact Genre / Sub-genre).
+2. الروح والحالة العامة للتراك (Vibe/Mood/Atmosphere).
+3. وصف فني دقيق للتركيبة والتوزيع: كيف تم صناعة هذا الإيقاع والأسلوب، وما هي الآلات الموسيقية (Instruments) ونوع الـ Synthesizers إذا وُجدت، وكيفية إعداد الـ (Drums/Bass).
+4. استنتاج وتحديد المقام (Maqam) أو السلم الموسيقي (Scale)، وتوضيح سرعة الإيقاع (Tempo/BPM) المرجح.
+5. استخراج "برومبت إنجليزي فائق الدقة" (Highly Detailed AI Music Prompt) صالح للاستخدام في Suno AI أو Udio لتوليد موسيقى مشابهة تماماً، مع تقديم شرح وتعقيب باللغة العربية حول سبب اختيار هذا البرومبت وكيف يمكن للمستخدم استغلاله.
+6. تقديم أمثلة ومقترحات حقيقية دقيقة جداً لأغاني أو تراكات أخرى مشابهة نفس الستايل على يوتيوب بالاسم الدقيق (Exact names and artists).
+
+تأكد من عدم تقليل الجودة وأن تكون إجاباتك مفصلة وتشع بالخبرة والأذن الموسيقية الدقيقة.`;
+
+      const promptText = audioFile 
+        ? "أعطني تحليلاً وتفكيكاً موسيقياً شاملاً ودقيقاً للغاية لهذا المقطع الصوتي، وضع ببالك كل نقطة تم طلبها."
+        : `أعطني تحليلاً وتفكيكاً موسيقياً شاملاً ودقيقاً للغاية للأغنية في هذا الرابط: ${youtubeLink} ، مع البرومبت الإنجليزي والأغاني المشابهة. إلخ.`;
+
+      const result = await callAI(promptText, sysPrompt, !!youtubeLink, false, audioPart);
+      setOutputResult(result);
+      addToHistory('analysis', targetName, result);
+    } catch (err: any) {
+      setError(err.message || t.audioError);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const copyToClipboard = () => {
     if (!outputResult) return;
     const textArea = document.createElement("textarea");
@@ -1143,30 +1201,42 @@ ${PHONETIC_RULES}
           {/* Audio Upload Section */}
           <div className={`mb-6 p-4 ${darkMode ? 'bg-[#09090b] border-slate-800' : 'bg-slate-50 border-slate-200'} border rounded-2xl`}>
             <div className="flex flex-col w-full gap-4">
-              <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <button 
-                    onClick={() => fileInputRef.current?.click()}
-                    className={`flex items-center gap-2 ${darkMode ? 'bg-slate-800 text-white hover:bg-slate-700' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'} px-4 py-2 rounded-xl text-sm font-bold transition-colors min-h-[44px]`}
-                  >
-                    <Upload size={18} /> {audioFile ? t.changeAudio : t.uploadAudio}
-                  </button>
-                  <input 
-                    type="file" 
-                    ref={fileInputRef} 
-                    onChange={handleAudioUpload} 
-                    accept="audio/*" 
-                    className="hidden" 
-                    aria-label={t.uploadAudio}
-                  />
+              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div className="flex flex-col w-full items-start gap-3">
+                  <div className="flex flex-col md:flex-row w-full items-start md:items-center gap-3">
+                    <button 
+                      onClick={() => fileInputRef.current?.click()}
+                      className={`flex items-center justify-center gap-2 ${darkMode ? 'bg-slate-800 text-white hover:bg-slate-700' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'} px-4 py-2 rounded-xl text-sm font-bold transition-colors min-h-[44px] shrink-0 w-full md:w-auto`}
+                    >
+                      <Upload size={18} /> {audioFile ? t.changeAudio : t.uploadAudio}
+                    </button>
+                    <input 
+                      type="file" 
+                      ref={fileInputRef} 
+                      onChange={handleAudioUpload} 
+                      accept="audio/*" 
+                      className="hidden" 
+                      aria-label={t.uploadAudio}
+                    />
+                    <div className="flex-1 w-full relative">
+                      <input 
+                        type="text" 
+                        value={youtubeLink}
+                        onChange={(e) => setYoutubeLink(e.target.value)}
+                        placeholder={t.youtubeLinkPlaceholder}
+                        className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-slate-200 focus:ring-rose-500' : 'bg-white border-slate-200 text-slate-900 focus:ring-rose-400'} border rounded-xl p-3 text-sm focus:ring-2 transition-all min-h-[44px] pl-10 rtl:pr-10 rtl:pl-3`}
+                      />
+                      <Youtube size={18} className={`absolute top-1/2 -translate-y-1/2 ${darkMode ? 'text-slate-400' : 'text-slate-500'} rtl:right-3 ltr:left-3`} />
+                    </div>
+                  </div>
                   {audioFile && (
-                    <div className="flex flex-col gap-1">
+                    <div className="flex flex-col gap-1 w-full mt-2">
                       <span className={`text-xs ${darkMode ? 'text-emerald-400' : 'text-emerald-600'} font-bold flex items-center gap-1`}>
                         {isUploadSuccess ? <Check size={14} /> : <RefreshCw size={14} className="animate-spin" />} 
                         {audioFile.name}
                       </span>
                       {!isUploadSuccess && (
-                        <div className="w-32 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                        <div className="w-full md:w-48 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
                           <div 
                             className="h-full bg-indigo-500 transition-all duration-300" 
                             style={{ width: `${uploadProgress}%` }}
@@ -1181,33 +1251,40 @@ ${PHONETIC_RULES}
                     </div>
                   )}
                 </div>
-                
-                {audioFile && isUploadSuccess && (
-                  <div className="flex flex-wrap gap-2 w-full md:w-auto mt-3 md:mt-0">
-                    <button 
-                      onClick={() => processAudio('general')}
-                      disabled={isLoading}
-                      className={`flex-1 md:flex-none flex items-center justify-center gap-2 ${darkMode ? 'bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border-blue-500/30' : 'bg-blue-100 text-blue-600 hover:bg-blue-200 border-blue-200'} border px-4 py-2 rounded-xl text-sm font-bold transition-colors disabled:opacity-50 min-h-[44px]`}
-                    >
-                      <FileAudio size={18} /> {t.transcribeGeneral}
-                    </button>
-                    <button 
-                      onClick={() => processAudio('egyptian')}
-                      disabled={isLoading}
-                      className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl text-sm font-bold transition-colors disabled:opacity-50 shadow-lg shadow-indigo-500/20 min-h-[56px]"
-                    >
-                      <FileAudio size={18} /> {t.transcribeEgyptian}
-                    </button>
-                    <button 
-                      onClick={() => processAudio('analyze_music')}
-                      disabled={isLoading}
-                      className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-500 text-white px-4 py-2 rounded-xl text-sm font-bold transition-colors disabled:opacity-50 shadow-lg shadow-amber-500/20 min-h-[56px]"
-                    >
-                      <Music size={18} /> {t.analyzeMusic}
-                    </button>
-                  </div>
-                )}
               </div>
+                
+              {((audioFile && isUploadSuccess) || youtubeLink.trim()) && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 w-full mt-2">
+                  <button 
+                    onClick={() => processAudio('general')}
+                    disabled={isLoading || (!audioFile && !youtubeLink.trim())}
+                    className={`flex items-center justify-center gap-2 ${darkMode ? 'bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border-blue-500/30' : 'bg-blue-100 text-blue-600 hover:bg-blue-200 border-blue-200'} border px-4 py-2 rounded-xl text-sm font-bold transition-colors disabled:opacity-50 min-h-[44px]`}
+                  >
+                    <FileAudio size={18} /> {t.transcribeGeneral}
+                  </button>
+                  <button 
+                    onClick={() => processAudio('egyptian')}
+                    disabled={isLoading || (!audioFile && !youtubeLink.trim())}
+                    className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl text-sm font-bold transition-colors disabled:opacity-50 shadow-lg shadow-indigo-500/20 min-h-[44px]"
+                  >
+                    <FileAudio size={18} /> {t.transcribeEgyptian}
+                  </button>
+                  <button 
+                    onClick={() => processAudio('analyze_music')}
+                    disabled={isLoading || (!audioFile && !youtubeLink.trim())}
+                    className="flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-500 text-white px-4 py-2 rounded-xl text-sm font-bold transition-colors disabled:opacity-50 shadow-lg shadow-amber-500/20 min-h-[44px]"
+                  >
+                    <Music size={18} /> {t.analyzeMusic}
+                  </button>
+                  <button 
+                    onClick={handleDeepMusicAnalysis}
+                    disabled={isLoading || (!audioFile && !youtubeLink.trim())}
+                    className="flex items-center justify-center gap-2 bg-rose-600 hover:bg-rose-500 text-white px-4 py-2 rounded-xl text-sm font-bold transition-colors disabled:opacity-50 shadow-lg shadow-rose-500/20 min-h-[44px]"
+                  >
+                    <Search size={18} /> {t.deepMusicAnalysisBtn}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -1829,6 +1906,10 @@ ${PHONETIC_RULES}
           </div>
         )}
       </AnimatePresence>
+
+      <footer className={`text-center pt-8 pb-4 mt-auto border-t-0 shadow-none bg-transparent ${darkMode ? 'text-slate-500' : 'text-slate-400'} text-sm font-bold font-arabic`}>
+        {language === 'ar' ? 'تم التطوير بواسطة عبدالرحمن عمرو' : 'Developed by Abdelrahman Amr'}
+      </footer>
 
       <style dangerouslySetInnerHTML={{ __html: `
         @import url('https://fonts.googleapis.com/css2?family=Aref+Ruqaa:wght@400;700&family=Pacifico&family=Noto+Sans+Arabic:wght@400;700;900&display=swap');
