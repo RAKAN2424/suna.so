@@ -14,15 +14,13 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 
 import { translations } from './translations';
 
-const PHONETIC_RULES = `**قواعد التشكيل الصوتي الاحترافية (Phonetic Transcription Framework) الإلزامية المطلقة:**
-إنت بتكتب "نوتة موسيقية/Midi File" بالحروف عشان تجبر الذكاء الاصطناعي (زي Suno و Udio) ينطق مصري لغة شارع مليون في المية، اتبع الميكانيزم ده حرفياً وبدون فذلكة نحوية:
-1. إعدام القاف تماماً (Phonetic Mapping): تحويل القاف إلى (ئـ) أو (ء) (مثال: ئَلْبِيْ، طَريْئْ، بَئْوَاْ) ولا تكتب قاف أبداً لمنع تفخيم الكلمة.
-2. هندسة السكون (Beat Stops & Time Stretching): حط سكون (ْ) على حروف المد (لِيَّاْ، يُـْومْ، دِلْـوَْئّتِْيْ) وفي أواخر الكلمات للتقفيل الحاد لتقطيع الصوت ومنع التمدد (Staccato).
-3. هندسة الشدة (Punch/Groove): استخدم الشدة (ّ) بكثافة (وحتى مع السكون: مَّْثِلْتْ) لخلق Bounce و Vocal weight عشان الكلمة "تخبط" مع الـ Kick.
-4. التشكيل العكسي المكسور (Micro-tuning): إكسر حروف العطف والمضارعة زي نطق الشارع المخطوف السريع (وِقولتْ، بِتْغِيبْ) بدل الفتحة.
-5. التاء المربوطة والمفتوحة: اقفل التاء المربوطة أو الهاء بفتحة وهاء وسكون (بَطَّايَهْ، حِكَايَهْ) عشان تجبر الصوت يفتح كأنه A صريح.
-6. التقطيع البصري: استخدم التطويل (ـ) لخلق مساحات وتحديد طول المقاطع الصوتية (Syllables).
-القاعدة الذهبية: مفيش إعراب ولا فصحى.. التشكيل بيتحط على حركة الشفايف واللسان وقت التسجيل (WYSIWYG)، استبدل الحروف المقعرة (ث، ذ، ظ) بحروف الشارع (س، ز، ض/ز).`;
+const PHONETIC_RULES = `**قواعد الكتابة والتشكيل للعامية المصرية باحترافية وذكاء:**
+1. التشكيل المصري الطبيعي والمريح: استخدم التشكيل ليعكس النطق العامي المصري بشكل احترافي.
+2. قاعدة السكون (الوقف): ضع علامة السكون (ْ) في نهاية كل كلمة (على الحرف الأخير من كل كلمة بلا استثناء) لخلق تقطيع حاد في الصوت (Pause/Staccato) بناءً على طلب المستخدم.
+3. قاعدة حرف القاف (إلغاء القاف تماماً): لا تكتب حرف القاف (ق) أبداً. استبدل أي قاف في الكلمة بهمزة (ء) أو ألف (أ) أو همزة المبرة (ئـ) لضمان عدم نطقها بالشكل الفصحى (مثال: ئلبي بدل قلبي، ديئ بدل دقيق، طريئ بدل طريق).
+4. الكلمات والحروف الزائدة: تنبيه هام، لا تقم أبداً بإضافة الواو المكسورة (وِ) أو أي حروف زائدة في بداية الكلمات أو الأفعال تعسفياً ما لم تكن هناك واو عطف حقيقية.
+5. استبدل الأحرف اللثوية (ث، ذ، ظ) بما يعادلها في النطق المصري (س، ز، ض).
+القاعدة الذهبية: طبق قواعد السكون في آخر الكلمات وتحويل القاف إلى همزة بحذافيرها، مع عدم حشو حروف غير ضرورية (مثل وِ).`;
 
 const appId = typeof (window as any).__app_id !== 'undefined' ? (window as any).__app_id : 'egyptian-studio-pro';
 
@@ -339,6 +337,35 @@ const App = () => {
     throw new Error(language === 'ar' ? "فشل إنشاء الصوت." : "Failed to generate audio.");
   };
 
+  const handleWriteLyrics = async () => {
+    if (!inputText.trim()) return;
+    setIsLoading(true); setError(null); setOutputType('lyrics_format');
+    
+    const sysPrompt = `أنت 'حَافِظ'، خبير المحتوى الغنائي المصري والمؤلف المحترف لأغاني (المهرجانات، التراب، الراب، والشعبي والمقسوم).
+مهمتك: تأليف كلمات أغنية كاملة بناءً على الفكرة أو الكلمات التي يعطيها لك المستخدم.
+مهم جداً:
+1. استخدم اللهجة المصرية العامية 100% وبطريقة طبيعية تماماً (كلمات الشارع الحقيقية بدون مبالغات أو أخطاء).
+2. إياك وتأليف كلمات ثم البحث عن أغانٍ لاستخراج كلمات منها! ألف الكلمات الأصلية من إبداعك من الصفر.
+3. لا تكتب القوافي من الأسفل للأعلى ولا تكتب بشكل معكوس، اكتب الكلمات بشكل متسلسل وطبيعي.
+4. قسم الكلمات بوضوح وضع اسم كل مقطع باللغة الإنجليزية بين أقواس مربعة هكذا: [Intro], [Verse], [Chorus], [Outro].
+5. استخدم قوافي قوية متناسبة مع السياق الذي طلبه المستخدم.
+6. أخرج فقط الكلمات كأنها مكتوبة في نوتة، بدون أي شروحات إضافية وبدون فصحى نهائياً.
+
+${PHONETIC_RULES}`;
+
+    try {
+      const promptText = language === 'ar' ? `ألف لي كلمات أغنية مصرية عن:\n"${inputText}"\n\nمهم: اكتب بالعامية المصرية الأصلية، وابعد عن الفصحى تماماً، واكتب بشكل طبيعي ومش متكلف.` : `Write original Egyptian Arabic song lyrics about:\n"${inputText}"\n\nMake sure it is 100% colloquial Egyptian, do NOT extract from existing songs.`;
+      
+      const result = await callAI(promptText, sysPrompt, false, false);
+      setOutputResult(result);
+      addToHistory('lyrics_format', inputText.substring(0, 50) + "...", result);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleGenerateSong = async () => {
     if (!inputText.trim()) return;
     setIsLoading(true); setError(null); setOutputResult(''); setOutputType('song');
@@ -649,15 +676,20 @@ ${PHONETIC_RULES}
     if (!rhymeWord.trim()) return;
     setIsLoading(true); setError(null);
     
-    const sysPrompt = `أنت خبير في القوافي الشعرية للعامية المصرية.
-    مهمتك: أعطني قائمة بكلمات مصرية عامية لها نفس القافية (Rhyme) للكلمة التي سيعطيك إياها المستخدم.
+    const sysPrompt = `أنت شاعر مصري وشبّيح قوافي، خبير في القوافي الشعرية للعامية المصرية الموزونة.
+    مهمتك: أعطني قائمة بكلمات مصرية عامية (نفس لغة الشارع والمهرجانات والراب) لها نفس وزن وقافية الكلمة التي يعطيها المستخدم.
+    الشروط:
+    1. الكلمات لازم تكون عامية مصرية 100% (بدون فصحى معقدة).
+    2. القافية لازم تكون مطابقة تماماً، ونفس عدد المقاطع الصوتية (الوزن الموسيقي) يكون متقارب جداً ميكسرش اللحن.
     أخرج النتيجة بصيغة JSON فقط كالتالي:
     {
-      "rhymes": ["كلمة1", "كلمة2", "كلمة3"]
-    }`;
+      "rhymes": ["كلمة1", "كلمة2", "كلمة3", "كلمة4", "كلمة5"]
+    }
+
+${PHONETIC_RULES}`;
 
     try {
-      const result = await callAI(language === 'ar' ? `هات كلمات لها نفس قافية: "${rhymeWord}"` : `Get words that rhyme with: "${rhymeWord}"`, sysPrompt, false, true);
+      const result = await callAI(language === 'ar' ? `هات كلمات عامية مصرية لها نفس القافية والوزن لكلمة: "${rhymeWord}"` : `Get Egyptian colloquial words with the exact same rhyme and meter for: "${rhymeWord}"`, sysPrompt, false, true);
       const parsedData = JSON.parse(result.replace(/^```json\n|\n```$/g, ''));
       setOutputResult(language === 'ar' ? `القوافي المقترحة لـ "${rhymeWord}":\n${parsedData.rhymes.join('\n')}` : `Suggested rhymes for "${rhymeWord}":\n${parsedData.rhymes.join('\n')}`);
       setOutputType('rhymes');
@@ -672,14 +704,19 @@ ${PHONETIC_RULES}
     if (!lineToRewrite.trim()) return;
     setIsLoading(true); setError(null);
     
-    const sysPrompt = `أنت خبير في إعادة صياغة النصوص والعبارات.
-    مهمتك: إعادة صياغة السطر الذي سيعطيك إياه المستخدم. حافظ على الوزن (Meter) والمعنى، واجعله يبدو أكثر جاذبية واحترافية.
-    أخرج السطر الجديد فقط دون أي مقدمات.`;
+    const sysPrompt = `أنت شاعر حقيقي و"صنايعي وكتاب أغاني محترف" للأغاني المصرية (مهرجانات، شعبي، راب، تراب).
+    مهمتك: إعادة صياغة وكتابة السطر الذي يعطيه لك المستخدم، ليكون أقوى وأكثر جاذبية.
+    الشروط الصارمة:
+    1. نفس القافية: يجب أن ينتهي السطر الجديد بنفس القافية (نفس الحرفين الأخيرين).
+    2. نفس الوزن (الرتم): يجب أن يكون السطر الجديد نفس الطول الموسيقي وتفعيلات السطر القديم تماماً.
+    3. العامية المصرية الأصيلة: إياك واستخدام الفصحى أو الكلمات المتقعرة. استخدم مصطلحات الشارع المصري، السرسجة (إن لزم)، والكلام الطبيعي المتداول.
+    4. أخرج السطر الجديد فقط دون أي مقدمات أو شروحات.
 
+${PHONETIC_RULES}`;
     try {
       const prompt = inputText.trim() 
-        ? (language === 'ar' ? `أعد صياغة هذا السطر: "${lineToRewrite}"\n\nمع الحفاظ على السياق المتعلق بـ: "${inputText}"` : `Rewrite this line: "${lineToRewrite}"\n\nMaintaining context of: "${inputText}"`)
-        : (language === 'ar' ? `أعد صياغة هذا السطر بطريقة إبداعية: "${lineToRewrite}"` : `Rewrite this line creatively: "${lineToRewrite}"`);
+        ? (language === 'ar' ? `أعد صياغة هذا السطر مع الحفاظ الصارم على وزنه وقافيته بالعامية المصرية: "${lineToRewrite}"\n\nالسياق العام للأغنية (عشان المعنى يكون لايق): "${inputText}"` : `Rewrite this line keeping exact same meter and rhyme in Egyptian Arabic: "${lineToRewrite}"\n\nContext of the song: "${inputText}"`)
+        : (language === 'ar' ? `أعد صياغة هذا السطر مع الحفاظ الصارم على وزنه وقافيته بالعامية المصرية: "${lineToRewrite}"` : `Rewrite this line keeping exact same meter and rhyme in Egyptian Arabic: "${lineToRewrite}"`);
         
       const result = await callAI(prompt, sysPrompt);
       setOutputResult(language === 'ar' ? `السطر الجديد:\n${result}` : `New line:\n${result}`);
@@ -720,12 +757,13 @@ ${PHONETIC_RULES}
 ${PHONETIC_RULES}
 
         إذا كان هناك 'أديبس' (Ad-libs) أو أصوات خلفية مميزة، اذكرها بين قوسين.
+        في تنسيق مقاطع الأغاني، يجب وضع أسماء المقاطع بين الأقواس المربعة [ ] هكذا: [Intro], [Verse 1], [Chorus], [Outro].
         أخرج النص المفرغ والمشكل فقط باحترافية تامة.`;
         promptText = "قم بتفريغ هذا الصوت واكتبه بالعامية المصرية الأصلية مع التشكيل الدقيق جداً.";
       } else if (mode === 'analyze_music') {
         sysPrompt = `أنت منتج موسيقي وخبير (A&R) متخصص في جميع أنواع الموسيقى.
         مهمتك هي تحليل المقطع الصوتي المرفق بدقة تقنية عالية جداً:
-        1. تفريغ الكلمات بدقة.
+        1. تفريغ الكلمات بدقة، وفي تنسيق الكلمات تأكد من تقسيمها ووضع أسماء المقاطع بين الأقواس المربعة [ ] هكذا: [Intro], [Verse], [Chorus].
         2. تحديد النوع الموسيقي بدقة (الجنر).
         3. تحليل 'الوايب' (Vibe)، الآلات المستخدمة، وسرعة الإيقاع (BPM).
         4. عمل تحليل في صيغة برومبت لموقع سونو (Suno AI) باللغة الإنجليزية. **يجب** أن يكون البرومبت مكونًا من حوالي 1000 حرف (مع حساب المسافات والنقاط في الكاركترز)، ويجب أن يصف الأغنية بالتفصيل الممل من حيث الجو والآلات والأسلوب الصوتي ليقوم Suno بعمل توليد دقيق لنفس الروح.
@@ -739,6 +777,7 @@ ${PHONETIC_RULES}
         sysPrompt = `أنت خبير في تفريغ الصوتيات بجميع اللغات واللهجات.
         مهمتك: استمع للملف الصوتي، تعرف على لغته أو لهجته، واكتب الكلام بدقة إملائية.
         ثم ضع التشكيل المناسب حسب لغة الأغنية أو المقطع الصوتي.
+        إذا كان المقطع الصوتي أغنية، قسم الكلمات وضع أسماء المقاطع بين الأقواس المربعة [ ] هكذا: [Intro], [Verse], [Chorus].
         أخرج النص المفرغ والمشكل فقط.`;
         promptText = "قم بتفريغ هذا الصوت واكتبه مع التشكيل المناسب للغته.";
       }
@@ -759,32 +798,23 @@ ${PHONETIC_RULES}
     setOutputType('analysis');
 
     try {
-      let audioPart: any = undefined;
       let targetName = "";
       
       if (audioFile) {
+        // Analyze uploaded audio locally via frontend AI call
         const base64Data = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
           reader.readAsDataURL(audioFile);
           reader.onload = () => {
-            if (typeof reader.result === 'string') {
-              resolve(reader.result.split(',')[1]);
-            }
+            if (typeof reader.result === 'string') resolve(reader.result.split(',')[1]);
           };
           reader.onerror = reject;
         });
-        audioPart = { data: base64Data, mimeType: audioFile.type };
+        const audioPart = { data: base64Data, mimeType: audioFile.type };
         targetName = audioFile.name;
-      }
 
-      if (youtubeLink.trim() && !audioFile) {
-        targetName = youtubeLink;
-      } else if (youtubeLink.trim() && audioFile) {
-        targetName = audioFile.name + " + URL";
-      }
-
-      const sysPrompt = `أنت مهندس صوت ومنتج موسيقي وموزع عالمي وباحث موسيقي محترف جداً بخصائص الذكاء الاصطناعي الفائق.
-مهمتك: ${audioFile ? "قم بتحليل هذا المقطع الصوتي المرفق بأقصى دقة ممكنة." : "قم باستخدام أداة البحث (Google Search) للبحث عن هذه الأغنية أو الموسيقى عبر رابط اليوتيوب المرفق، وحللها بكل دقة واحترافية."}
+        const sysPrompt = `أنت مهندس صوت ومنتج موسيقي وموزع عالمي وباحث موسيقي محترف جداً بخصائص الذكاء الاصطناعي الفائق.
+مهمتك: قم بتحليل هذا المقطع الصوتي المرفق بأقصى دقة ممكنة بالاعتماد على التحليل السمعي الفعلي للملف.
 المطلوب منك تحليل وتفكيك موسيقي شامل جداً:
 1. تصنيف النوع الموسيقي بدقة عالية (Exact Genre / Sub-genre).
 2. الروح والحالة العامة للتراك (Vibe/Mood/Atmosphere).
@@ -795,13 +825,32 @@ ${PHONETIC_RULES}
 
 تأكد من عدم تقليل الجودة وأن تكون إجاباتك مفصلة وتشع بالخبرة والأذن الموسيقية الدقيقة.`;
 
-      const promptText = audioFile 
-        ? "أعطني تحليلاً وتفكيكاً موسيقياً شاملاً ودقيقاً للغاية لهذا المقطع الصوتي، وضع ببالك كل نقطة تم طلبها."
-        : `أعطني تحليلاً وتفكيكاً موسيقياً شاملاً ودقيقاً للغاية للأغنية في هذا الرابط: ${youtubeLink} ، مع البرومبت الإنجليزي والأغاني المشابهة. إلخ.`;
+        const promptText = "أعطني تحليلاً وتفكيكاً موسيقياً شاملاً ودقيقاً للغاية لهذا المقطع الصوتي، وضع ببالك كل نقطة تم طلبها.";
+        const result = await callAI(promptText, sysPrompt, false, false, audioPart);
+        
+        setOutputResult(result);
+        addToHistory('analysis', targetName, result);
+      } else if (youtubeLink.trim()) {
+        // Call backend API to download audio and analyze it correctly without hallucination
+        targetName = youtubeLink;
+        const res = await fetch('/api/analyze-youtube', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ url: youtubeLink })
+        });
+        
+        const data = await res.json();
+        
+        if (!res.ok) {
+          throw new Error(data.error || "Failed to analyze YouTube video");
+        }
+        
+        setOutputResult(data.result);
+        addToHistory('analysis', targetName, data.result);
+      }
 
-      const result = await callAI(promptText, sysPrompt, !!youtubeLink, false, audioPart);
-      setOutputResult(result);
-      addToHistory('analysis', targetName, result);
     } catch (err: any) {
       setError(err.message || t.audioError);
     } finally {
@@ -1257,21 +1306,21 @@ ${PHONETIC_RULES}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 w-full mt-2">
                   <button 
                     onClick={() => processAudio('general')}
-                    disabled={isLoading || (!audioFile && !youtubeLink.trim())}
+                    disabled={isLoading || !audioFile}
                     className={`flex items-center justify-center gap-2 ${darkMode ? 'bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border-blue-500/30' : 'bg-blue-100 text-blue-600 hover:bg-blue-200 border-blue-200'} border px-4 py-2 rounded-xl text-sm font-bold transition-colors disabled:opacity-50 min-h-[44px]`}
                   >
                     <FileAudio size={18} /> {t.transcribeGeneral}
                   </button>
                   <button 
                     onClick={() => processAudio('egyptian')}
-                    disabled={isLoading || (!audioFile && !youtubeLink.trim())}
+                    disabled={isLoading || !audioFile}
                     className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl text-sm font-bold transition-colors disabled:opacity-50 shadow-lg shadow-indigo-500/20 min-h-[44px]"
                   >
                     <FileAudio size={18} /> {t.transcribeEgyptian}
                   </button>
                   <button 
                     onClick={() => processAudio('analyze_music')}
-                    disabled={isLoading || (!audioFile && !youtubeLink.trim())}
+                    disabled={isLoading || !audioFile}
                     className="flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-500 text-white px-4 py-2 rounded-xl text-sm font-bold transition-colors disabled:opacity-50 shadow-lg shadow-amber-500/20 min-h-[44px]"
                   >
                     <Music size={18} /> {t.analyzeMusic}
@@ -1441,6 +1490,14 @@ ${PHONETIC_RULES}
               className="col-span-1 py-3.5 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50 transition-all shadow-lg shadow-blue-500/20 min-h-[56px]"
             >
               <BookOpen size={18} /> {t.formatLyricsBtn}
+            </button>
+
+            <button 
+              onClick={handleWriteLyrics}
+              disabled={isLoading || !inputText.trim()}
+              className="col-span-1 py-3.5 bg-sky-600 hover:bg-sky-500 text-white rounded-2xl font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-sky-500/20 disabled:opacity-50 transition-all min-h-[56px]"
+            >
+              <Feather size={18} /> {t.writeLyricsBtn}
             </button>
 
             <button 
